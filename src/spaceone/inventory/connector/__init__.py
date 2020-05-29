@@ -1,0 +1,1 @@
+from spaceone.inventory.connector.gcp_compute_connector import GcpComputeConnector
