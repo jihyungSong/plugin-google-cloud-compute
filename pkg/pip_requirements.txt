@@ -1,8 +1,5 @@
---extra-index-url http://pypi.pyengine.net:8180/simple
---trusted-host pypi.pyengine.net
-
-spaceone-core>=0.1.42
-spaceone-api>=0.1.40
-google-api-python-client
-google-auth
+spaceone-core
+spaceone-api
 spaceone-tester
+boto3
+schematics

@@ -1,3 +1,0 @@
-GLOBAL:
-  SERVICE: inventory
-  PORT: 50051

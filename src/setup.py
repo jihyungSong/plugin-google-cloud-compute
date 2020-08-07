@@ -16,14 +16,14 @@
 
 from setuptools import setup, find_packages
 
-with open('VERSION', 'r') as f: 
+with open('VERSION', 'r') as f:
     VERSION = f.read().strip()
     f.close()
 
 setup(
-    name='plugin-googlecloud-compute',
+    name='plugin-aws-ec2',
     version=VERSION,
-    description='GCP compute inventory collector',
+    description='AWS EC2 inventory collector',
     long_description='',
     url='https://www.spaceone.dev/',
     author='MEGAZONE SpaceONE Team',
@@ -33,8 +33,9 @@ setup(
     install_requires=[
         'spaceone-core',
         'spaceone-api',
-        'google-auth',
-        'google-api-python-client',
+        'spaceone-tester',
+        'boto3',
+        'schematics'
     ],
     zip_safe=False,
 )

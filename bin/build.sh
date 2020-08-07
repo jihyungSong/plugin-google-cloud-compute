@@ -1,6 +1,6 @@
 #! /bin/bash
 # Build a docker image
 cd ..
-docker build -t pyengine/gcp-compute .
-docker tag pyengine/gcp-compute pyengine/gcp-compute:1.0
-docker tag pyengine/gcp-compute spaceone/gcp-compute:1.0
+docker build -t pyengine/aws-ec2 .
+# docker tag pyengine/aws-ec2 pyengine/aws-ec2:1.4
+docker tag pyengine/aws-ec2 spaceone/aws-ec2:1.3
