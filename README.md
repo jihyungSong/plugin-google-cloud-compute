@@ -1,2 +1,2 @@
-# plugin-aws-ec2
-Plugin for AWS EC2
+# plugin-googlecloud-compute
+Plugin for Google Cloud Compute
