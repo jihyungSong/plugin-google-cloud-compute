@@ -1,13 +1,13 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.load_balancer import LoadBalancer
-from spaceone.inventory.connector.ec2_connector import EC2Connector
+from spaceone.inventory.connector.gcp_compute_connector import GcpComputeConnector
 
 
 class LoadBalancerManager(BaseManager):
 
-    def __init__(self, params, ec2_connector=None):
+    def __init__(self, params, gcp_compute_connector=None):
         self.params = params
-        self.ec2_connector: EC2Connector = ec2_connector
+        self.gcp_compute_connector: GcpComputeConnector = gcp_compute_connector
 
     def get_load_balancer_info(self, load_balancers, target_groups, instance_id=None, instance_ip=None):
         '''

@@ -1,7 +1,7 @@
 from schematics import Model
 from schematics.types import serializable, ModelType, ListType, StringType
 from spaceone.inventory.model import OS, AWS, Hardware, SecurityGroupRule, Compute, LoadBalancer, VPC, Subnet, \
-    AutoScalingGroup, NIC, Disk, ServerMetadata
+    AutoScalingGroup, NIC, Disk, ServerMetadata, Region
 
 
 class ReferenceModel(Model):
@@ -54,7 +54,7 @@ class Server(Model):
     @serializable
     def reference(self):
         return {
-            "resource_id": f"arn:aws:ec2:{self.data.compute.region_name}:{self.data.compute.account_id}:instance/{self.data.compute.instance_id}",
-            "external_link": f"https://{self.data.compute.region_name}.console.aws.amazon.com/ec2/v2/home?region={self.data.compute.region_name}#Instances:instanceId={self.data.compute.instance_id}"
+            "resource_id": f"arn:aws:gcp_compute:{self.data.compute.region_name}:{self.data.compute.account_id}:instance/{self.data.compute.instance_id}",
+            "external_link": f"https://{self.data.compute.region_name}.console.aws.amazon.com/gcp_compute/v2/home?region={self.data.compute.region_name}#Instances:instanceId={self.data.compute.instance_id}"
         }
 

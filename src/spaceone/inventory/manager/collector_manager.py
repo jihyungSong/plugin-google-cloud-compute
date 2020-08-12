@@ -3,8 +3,8 @@ __all__ = ['CollectorManager']
 import time
 import logging
 from spaceone.core.manager import BaseManager
-from spaceone.inventory.connector import EC2Connector
-from spaceone.inventory.manager.ec2 import EC2InstanceManager, AutoScalingGroupManager, LoadBalancerManager, \
+from spaceone.inventory.connector import GcpComputeConnector
+from spaceone.inventory.manager.gcp_compute import ComputeInstanceManager, AutoScalingGroupManager, LoadBalancerManager, \
     DiskManager, NICManager, VPCManager, SecurityGroupRuleManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
 from spaceone.inventory.model.server import Server
@@ -22,66 +22,66 @@ class CollectorManager(BaseManager):
     def verify(self, secret_data, region_name):
         """ Check connection
         """
-        ec2_connector = self.locator.get_connector('EC2Connector')
-        r = ec2_connector.verify(secret_data, region_name)
+        gcp_compute_connector = self.locator.get_connector('GcpComputeConnector')
+        r = gcp_compute_connector.verify(secret_data, region_name)
         # ACTIVE/UNKNOWN
         return r
 
     def list_regions(self, secret_data, region_name):
-        ec2_connector: EC2Connector = self.locator.get_connector('EC2Connector')
-        ec2_connector.set_client(secret_data, region_name)
+        gcp_compute_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
+        gcp_compute_connector.set_client(secret_data, region_name)
 
-        return ec2_connector.list_regions()
+        return gcp_compute_connector.list_regions()
 
     def list_instances(self, params):
         server_vos = []
-        ec2_connector: EC2Connector = self.locator.get_connector('EC2Connector')
-        ec2_connector.set_client(params['secret_data'], params['region_name'])
+        gcp_compute_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
+        gcp_compute_connector.set_client(params['secret_data'], params['region_name'])
 
         instance_filter = {}
         # Instance list and account ID
         if 'instance_ids' in params and len(params['instance_ids']) > 0:
             instance_filter.update({'Filters': [{'Name': 'instance-id', 'Values': params['instance_ids']}]})
 
-        instances, account_id = ec2_connector.list_instances(**instance_filter)
+        instances, account_id = gcp_compute_connector.list_instances(**instance_filter)
 
         print(f'===== [{params["region_name"]}]  /  INSTANCE COUNT : {len(instances)}')
 
         if len(instances) > 0:
             # Instance Type
-            itypes = ec2_connector.list_instance_types()
+            itypes = gcp_compute_connector.list_instance_types()
 
             # Image
-            images = ec2_connector.list_images(ImageIds=self.get_image_ids(instances))
+            images = gcp_compute_connector.list_images(ImageIds=self.get_image_ids(instances))
 
             # Autoscaling group list
-            auto_scaling_groups = ec2_connector.list_auto_scaling_groups()
-            launch_configurations = ec2_connector.list_launch_configurations()
+            auto_scaling_groups = gcp_compute_connector.list_auto_scaling_groups()
+            launch_configurations = gcp_compute_connector.list_launch_configurations()
 
             # LB list
-            load_balancers = ec2_connector.list_load_balancers()
-            target_groups = ec2_connector.list_target_groups()
+            load_balancers = gcp_compute_connector.list_load_balancers()
+            target_groups = gcp_compute_connector.list_target_groups()
 
             for target_group in target_groups:
-                target_healths = ec2_connector.list_target_health(target_group.get('TargetGroupArn'))
+                target_healths = gcp_compute_connector.list_target_health(target_group.get('TargetGroupArn'))
                 target_group['target_healths'] = target_healths
 
             # VPC
-            vpcs = ec2_connector.list_vpcs()
-            subnets = ec2_connector.list_subnets()
+            vpcs = gcp_compute_connector.list_vpcs()
+            subnets = gcp_compute_connector.list_subnets()
 
             # Volume
-            volumes = ec2_connector.list_volumes()
+            volumes = gcp_compute_connector.list_volumes()
 
             # IP
-            eips = ec2_connector.list_elastic_ips()
+            eips = gcp_compute_connector.list_elastic_ips()
 
             # Security Group
-            sgs = ec2_connector.list_security_groups()
+            sgs = gcp_compute_connector.list_security_groups()
 
-            ins_manager: EC2InstanceManager = EC2InstanceManager(params, ec2_connector=ec2_connector)
+            ins_manager: ComputeInstanceManager = ComputeInstanceManager(params, gcp_compute_connector=gcp_compute_connector)
             asg_manager: AutoScalingGroupManager = AutoScalingGroupManager(params)
-            elb_manager: LoadBalancerManager = LoadBalancerManager(params, ec2_connector=ec2_connector)
+            elb_manager: LoadBalancerManager = LoadBalancerManager(params, gcp_compute_connector=gcp_compute_connector)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
             vpc_manager: VPCManager = VPCManager(params)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import time
 import logging
 import concurrent.futures
@@ -7,7 +6,7 @@ from spaceone.core.service import *
 from spaceone.inventory.manager.collector_manager import CollectorManager
 
 _LOGGER = logging.getLogger(__name__)
-DEFAULT_REGION = 'us-east-1'
+DEFAULT_REGION = 'asia-east1'
 FILTER_FORMAT = [
     {
         'key': 'project_id',
@@ -72,29 +71,19 @@ class CollectorService(BaseService):
         super().__init__(metadata)
         self.collector_manager: CollectorManager = self.locator.get_manager('CollectorManager')
 
-    @check_required(['options'])
-    def init(self, params):
+    @transaction
+    @check_required(['options', 'credentials'])
+    def init(self):
         """ init plugin by options
         """
         capability = {
             'filter_format': FILTER_FORMAT,
             'supported_resource_type': SUPPORTED_RESOURCE_TYPE
-        }
-        return {'metadata': capability}
-
-    @transaction
-    @check_required(['options'])
-    def init(self, params):
-        """ init plugin by options
-        """
-        capability = {
-            'filter_format':FILTER_FORMAT,
-            'supported_resource_type' : SUPPORTED_RESOURCE_TYPE
             }
         return {'metadata': capability}
 
     @transaction
-    @check_required(['options','secret_data'])
+    @check_required(['options', 'secret_data'])
     def verify(self, params):
         """ verify options capability
         Args:

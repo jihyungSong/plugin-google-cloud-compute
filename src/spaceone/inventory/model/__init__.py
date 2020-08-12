@@ -9,7 +9,7 @@ from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.security_group_rule import SecurityGroupRule
 from spaceone.inventory.model.subnet import Subnet
 from spaceone.inventory.model.vpc import VPC
-
+from spaceone.inventory.model.region import Region
 # METADATA
 from spaceone.inventory.model.metadata.metadata import *
 from spaceone.inventory.model.metadata.metadata_dynamic_field import *

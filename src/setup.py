@@ -21,9 +21,9 @@ with open('VERSION', 'r') as f:
     f.close()
 
 setup(
-    name='plugin-aws-ec2',
+    name='plugin-googlecloud-compute',
     version=VERSION,
-    description='AWS EC2 inventory collector',
+    description='GCP VM instance inventory collector',
     long_description='',
     url='https://www.spaceone.dev/',
     author='MEGAZONE SpaceONE Team',
@@ -33,8 +33,8 @@ setup(
     install_requires=[
         'spaceone-core',
         'spaceone-api',
-        'spaceone-tester',
-        'boto3',
+        'google-auth',
+        'google-api-python-client',
         'schematics'
     ],
     zip_safe=False,

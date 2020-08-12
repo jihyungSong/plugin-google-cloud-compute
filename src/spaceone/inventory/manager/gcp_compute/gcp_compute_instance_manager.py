@@ -3,13 +3,13 @@ from spaceone.inventory.model.compute import Compute
 from spaceone.inventory.model.aws import AWS
 from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
-from spaceone.inventory.connector.ec2_connector import EC2Connector
+from spaceone.inventory.connector.gcp_compute_connector import GcpComputeConnector
 
-class EC2InstanceManager(BaseManager):
+class ComputeInstanceManager(BaseManager):
 
-    def __init__(self, params, ec2_connector=None):
+    def __init__(self, params, gcp_compute_connector=None):
         self.params = params
-        self.ec2_connector: EC2Connector = ec2_connector
+        self.gcp_compute_connector: GcpComputeConnector = gcp_compute_connector
 
     def get_server_info(self, instance, itypes, images, eips):
         '''
