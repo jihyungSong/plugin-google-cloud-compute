@@ -1,7 +1,7 @@
 import time
 import logging
 import concurrent.futures
-
+from pprint import pprint
 from spaceone.core.service import *
 from spaceone.inventory.manager.collector_manager import CollectorManager
 
@@ -72,8 +72,8 @@ class CollectorService(BaseService):
         self.collector_manager: CollectorManager = self.locator.get_manager('CollectorManager')
 
     @transaction
-    @check_required(['options', 'credentials'])
-    def init(self):
+    @check_required(['options'])
+    def init(self, params):
         """ init plugin by options
         """
         capability = {
@@ -98,9 +98,8 @@ class CollectorService(BaseService):
         """
         manager = self.locator.get_manager('CollectorManager')
         secret_data = params['secret_data']
-        region_name = params.get('region_name', DEFAULT_REGION)
-        active = manager.verify(secret_data, region_name)
-
+        options = params.get('options', {})
+        active = manager.verify(options, secret_data)
         return {}
 
     @transaction
@@ -124,6 +123,7 @@ class CollectorService(BaseService):
 
         server_resource_format = {'resource_type': 'inventory.Server',
                                   'match_rules': {'1': ['data.compute.instance_id']}}
+
         region_resource_format = {'resource_type': 'inventory.Region',
                                   'match_rules': {'1': ['region_code', 'region_type']}}
 
@@ -151,7 +151,6 @@ class CollectorService(BaseService):
         params_for_regions = []
 
         (query, instance_ids, filter_region_name) = self._check_query(params['filter'])
-        query.append({'Name': 'instance-state-name', 'Values': ['running', 'shutting-down', 'stopping', 'stopped']})
 
         target_regions = self.get_all_regions(params['secret_data'], filter_region_name)
 
@@ -212,4 +211,5 @@ class CollectorService(BaseService):
             return filter_region_name
 
         regions = self.collector_manager.list_regions(secret_data, DEFAULT_REGION)
-        return [region.get('RegionName') for region in regions if region.get('RegionName') is not None]
+        regions_name_list = [region.get('name', None) for region in regions if region.get('name') is not None]
+        return regions_name_list

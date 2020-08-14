@@ -7,8 +7,6 @@ from spaceone.tester import TestCase, print_json
 
 GOOGLE_APPLICATION_CREDENTIALS_PATH = os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', None)
 
-print(GOOGLE_APPLICATION_CREDENTIALS_PATH)
-
 if GOOGLE_APPLICATION_CREDENTIALS_PATH is None:
     print("""
         ##################################################
@@ -24,10 +22,12 @@ if GOOGLE_APPLICATION_CREDENTIALS_PATH is None:
     """)
     exit
 
+
 def _get_credentials():
     with open(GOOGLE_APPLICATION_CREDENTIALS_PATH) as json_file:
         json_data = json.load(json_file)
         return json_data
+
 
 class TestCollector(TestCase):
 
@@ -38,17 +38,15 @@ class TestCollector(TestCase):
     def test_verify(self):
         options = {
         }
-        credentials = _get_credentials()
-        print(credentials)
-        v_info = self.inventory.Collector.verify({'options': options, 'secret_data': credentials})
+        secret_data = _get_credentials()
+        v_info = self.inventory.Collector.verify({'options': options, 'secret_data': secret_data})
         print_json(v_info)
 
     def test_collect(self):
+        secret_data = _get_credentials()
         options = {}
-        credentials = _get_credentials()
         filter = {}
-
-        resource_stream = self.inventory.Collector.collect({'options': options, 'secret_data': credentials,
+        resource_stream = self.inventory.Collector.collect({'options': options, 'secret_data': secret_data,
                                                             'filter': filter})
         # print(resource_stream)
 

@@ -2,13 +2,12 @@ __all__ = ["GcpComputeConnector"]
 
 import logging
 import os
-import json
 import itertools
 import re
-# GCP Compute SDK for Python
 import google.oauth2.service_account
 import googleapiclient
 import googleapiclient.discovery
+from pprint import pprint
 from spaceone.core.connector import BaseConnector
 from spaceone.core.utils import deep_merge
 from collections import defaultdict
@@ -38,16 +37,15 @@ INSTANCE_TYPE_FILE = '%s/conf/%s' % (os.path.dirname(os.path.abspath(__file__)),
 class GcpComputeConnector(BaseConnector):
 
     def __init__(self, transaction=None, conf=None):
-        self.session = None
-        self.ec2_client = None
-        self.asg_client = None
-        self.elbv2_client = None
+        self.client = None
+        self.project_id = None
+        self.zone = None
 
-    def verify(self, secret_data, region_name):
-        self._setConnect(secret_data, region_name)
+    def verify(self, options, secret_data):
+        self.get_connect(secret_data)
         return "ACTIVE"
 
-    def _setConnect(self, secret_data, region_name, service="gcp_compute"):
+    def get_connect(self, secret_data, service="gcp_compute"):
         """
         cred(dict)
             - type: ..
@@ -55,17 +53,41 @@ class GcpComputeConnector(BaseConnector):
             - token_uri: ...
             - ...
         """
-        self.cred = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
-        self.project_id = secret_data['project_id']
-        self.region = region_name
-
+        credentials = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
         try:
-            self.client = googleapiclient.discovery.build('compute', 'v1', credentials=self.cred)
-            print(self.client)
-
+            return googleapiclient.discovery.build('compute', 'v1', credentials=credentials)
         except Exception as e:
             print(e)
-            raise self.client(message='connection failed. Please check your authencation information.')
+            raise self.client(message='connection failed. Please check your authentication information.')
+
+    def set_client(self, secret_data, region_name):
+        self.client = self.get_connect(secret_data)
+        self.project_id = secret_data.get('project_id')
+        self.zone = region_name
+
+    def list_regions(self, secret_data):
+        result = self.client.zones().list(project=secret_data.get('project_id')).execute()
+        regions = result.get('items', [])
+        return regions
+
+    def list_instances(self, **query):
+        status_filter = {'key': 'status', 'values': ['STAGING', 'RUNNING', 'STOPPING', 'REPAIRING']}
+
+        if 'filter' in query:
+            query.get('filter').append(status_filter)
+        else:
+            query.update({'filter': [status_filter]})
+
+        query = self.generate_key_query('filter', self._get_filter_to_params(**query), '', is_default=True, **query)
+        result = self.client.instances().list(**query).execute()
+        compute_instances = result.get('items', [])
+        return compute_instances, self.project_id
+
+    def list_instance_types(self, **query):
+        query = self.generate_query(is_paginate=True, **query)
+        result = self.client.machineTypes().list(**query).execute()
+        instance_types = result.get('items', [])
+        return instance_types
 
     def collectInfo(self, query, region_id=None, zone_id=None, pool_id=None, project_id=None):
         (query, instance_ids) = self._checkQuery(query)
@@ -75,15 +97,6 @@ class GcpComputeConnector(BaseConnector):
         '''
 
         return self._listInstances(region_id, zone_id, pool_id, project_id, query, instance_ids)
-
-    def _getInstanceTypeFromPriceAPI(self, instance_type):
-        pass
-
-    def _checkQuery(self, query):
-        instance_ids = []
-        filters = []
-
-        return (filters, instance_ids)
 
     def _listInstances(self, region_id, zone_id, pool_id, project_id, query, instance_ids):
 
@@ -146,31 +159,6 @@ class GcpComputeConnector(BaseConnector):
                 yield server_data_dic
 
         # return resource_list
-
-    def _call_instance_list(self, zone):
-        instances = []
-        try:
-            result = self.client.instances().list(project=self.project_id, zone=zone).execute()
-            instances = result['items'] if 'items' in result else []
-            # firewalls = self._get_firewall_list(self.project_id)
-            # pprint.pprint(firewalls)
-
-        except Exception as e:
-            _LOGGER.error(e)
-        return instances
-
-    def _call_zone_list(self):
-        region_filter = "name = " + self.zone + "-*"
-
-        zone_list = []
-        result = self.client.zones().list(project=self.project_id, filter=region_filter).execute()
-        regions = result['items'] if 'items' in result else []
-        # print(regions)
-
-        for region in regions:
-            zone_list.append(region["name"])
-
-        return zone_list
 
     def _composite_default_data(self, instance, pool_id, project_id, region_id, zone_id):
         ret_default_dic = nested_dict()
@@ -713,3 +701,48 @@ class GcpComputeConnector(BaseConnector):
 
         sub_data = [disk, nic, sg_rules, metadata_items]
         return sub_data
+
+    def _get_filter_to_params(self, **query):
+        filtering_list = []
+        filters = query.get('filter', None)
+        if isinstance(filters, list) and filters is not None:
+            for single_filter in filters:
+                filter_key = single_filter.get('key', '')
+                filter_values = single_filter.get('values', [])
+                filter_str = self._get_full_filter_string(filter_key, filter_values)
+                if filter_str != '':
+                    filtering_list.append(filter_str)
+
+            return ' AND '.join(filtering_list)
+
+    def generate_query(self, is_default=False, **query):
+        if is_default:
+            query.update({
+                'project': self.project_id,
+                'zone': self.zone
+            })
+        return query
+
+    def generate_key_query(self, key, value, delete, is_default=False, **query):
+        if is_default:
+            if delete != '':
+                query.pop(delete, None)
+
+            query.update({
+                key: value,
+                'project': self.project_id,
+                'zone': self.zone
+            })
+
+        return query
+
+    @staticmethod
+    def _get_full_filter_string(filter_key, filter_values):
+        filter_string = ''
+        if filter_key != '' and filter_values != [] and isinstance(filter_values, list):
+            single_filter_list = [f'{filter_key}={x}' for x in filter_values]
+            join_string = ' OR '.join(single_filter_list)
+            filter_string = f'({join_string})'
+        elif filter_key != '' and filter_values != [] and not isinstance(filter_values, dict):
+            filter_string = f'({filter_key}={filter_values})'
+        return filter_string

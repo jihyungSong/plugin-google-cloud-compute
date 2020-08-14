@@ -2,6 +2,7 @@ __all__ = ['CollectorManager']
 
 import time
 import logging
+from pprint import pprint
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GcpComputeConnector
 from spaceone.inventory.manager.gcp_compute import ComputeInstanceManager, AutoScalingGroupManager, LoadBalancerManager, \
@@ -19,19 +20,18 @@ class CollectorManager(BaseManager):
     def __init__(self, transaction):
         super().__init__(transaction)
 
-    def verify(self, secret_data, region_name):
+    def verify(self, options, secret_data):
         """ Check connection
         """
         gcp_compute_connector = self.locator.get_connector('GcpComputeConnector')
-        r = gcp_compute_connector.verify(secret_data, region_name)
+        r = gcp_compute_connector.verify(options, secret_data)
         # ACTIVE/UNKNOWN
         return r
 
     def list_regions(self, secret_data, region_name):
         gcp_compute_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
         gcp_compute_connector.set_client(secret_data, region_name)
-
-        return gcp_compute_connector.list_regions()
+        return gcp_compute_connector.list_regions(secret_data)
 
     def list_instances(self, params):
         server_vos = []
@@ -39,17 +39,17 @@ class CollectorManager(BaseManager):
         gcp_compute_connector.set_client(params['secret_data'], params['region_name'])
 
         instance_filter = {}
-        # Instance list and account ID
-        if 'instance_ids' in params and len(params['instance_ids']) > 0:
-            instance_filter.update({'Filters': [{'Name': 'instance-id', 'Values': params['instance_ids']}]})
 
-        instances, account_id = gcp_compute_connector.list_instances(**instance_filter)
+        if 'instance_ids' in params and len(params.get('instance_ids', [])) > 0:
+            instance_filter.update({'filter': [{'key': 'id', 'values': params['instance_ids']}]})
+
+        instances, project_id = gcp_compute_connector.list_instances(**instance_filter)
 
         print(f'===== [{params["region_name"]}]  /  INSTANCE COUNT : {len(instances)}')
 
         if len(instances) > 0:
-            # Instance Type
-            itypes = gcp_compute_connector.list_instance_types()
+            # Get Instance Type for GCP
+            instance_types = gcp_compute_connector.list_instance_types()
 
             # Image
             images = gcp_compute_connector.list_images(ImageIds=self.get_image_ids(instances))
@@ -92,7 +92,7 @@ class CollectorManager(BaseManager):
                 instance_id = instance.get('InstanceId')
                 instance_ip = instance.get('PrivateIpAddress')
 
-                server_data = ins_manager.get_server_info(instance, itypes, images, eips)
+                server_data = ins_manager.get_server_info(instance, instance_types, images, eips)
                 auto_scaling_group_vo = asg_manager.get_auto_scaling_info(instance_id, auto_scaling_groups,
                                                                           launch_configurations)
 
