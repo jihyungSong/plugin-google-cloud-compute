@@ -1,20 +1,5 @@
 from schematics import Model
-from schematics.types import StringType, IntType, BooleanType, ModelType
-
-
-class DiskTags(Model):
-    volume_id = StringType(serialize_when_none=False)
-    volume_type = StringType(choices=('local-ssd', 'pd-balanced', 'pd-ssd', 'pd-standard'), serialize_when_none=False)
-    encrypted = BooleanType(serialize_when_none=False)
-    iops = IntType(serialize_when_none=False)
-
-
-class Disk(Model):
-    device_index = IntType() #okay
-    device = StringType()
-    disk_type = StringType(default="EBS") # there's no such EBS
-    size = IntType()
-    tags = ModelType(DiskTags, default={})
+from schematics.types import StringType, IntType, FloatType, BooleanType, ModelType, DictType
 
 '''
 {
@@ -40,3 +25,23 @@ class Disk(Model):
   "kind": "compute#disk"
 }
 '''
+
+
+class DiskTags(Model):
+    disk_id = StringType(serialize_when_none=False)
+    disk_name = StringType(serialize_when_none=False)
+    description = StringType(serialize_when_none=False)
+    zone = StringType(serialize_when_none=False)
+    disk_type = StringType(choices=('local-ssd', 'pd-balanced', 'pd-ssd', 'pd-standard'), serialize_when_none=False)
+    encrypted = BooleanType(default=True)
+    read_iops = FloatType(serialize_when_none=False)
+    write_iops = FloatType(serialize_when_none=False)
+    labels = DictType(serialize_when_none=False)
+
+
+class Disk(Model):
+    device_index = IntType()
+    device = StringType(default="")
+    disk_type = StringType(default="disk")
+    size = FloatType()
+    tags = ModelType(DiskTags, default={})

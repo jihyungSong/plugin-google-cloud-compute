@@ -1,5 +1,5 @@
 from schematics import Model
-from schematics.types import StringType, IntType, ListType, ModelType
+from schematics.types import StringType, IntType, ListType, ModelType, DictType
 
 '''
  "networkInterfaces": [
@@ -23,8 +23,6 @@ from schematics.types import StringType, IntType, ListType, ModelType
       ]
 '''
 
-class NICTags(Model):
-    public_dns = StringType(serialize_when_none=False)
 
 class NIC(Model):
     device_index = IntType() #ok
@@ -32,9 +30,9 @@ class NIC(Model):
     # subnetwork 로 해서 찾아와야 함
     cidr = StringType()
 
-    nic_type = StringType()
-    ip_addresses = ListType(StringType()) #ok
+    nic_type = StringType(default="Virtual")  # 확인 필요
+    ip_addresses = ListType(StringType())     # 확인필요 (accessConfig)
 
-    mac_address = StringType() # couldn't find one yet
-    public_ip_address = StringType() #if setup on VPC is availble can get
-    tags = ModelType(NICTags, default={})
+    mac_address = StringType(default="")
+    public_ip_address = StringType()
+    tags = ModelType(DictType, default={})

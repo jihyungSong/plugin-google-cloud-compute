@@ -1,25 +1,6 @@
 from schematics import Model
 from schematics.types import IntType, FloatType, StringType, ListType, BooleanType, DateType
 
-
-class Hardware(Model):
-    core = IntType(default=0)
-    memory = FloatType(default=0.0)
-    memory_count = IntType(default=0, serialize_when_none=False)
-    manufacturer = StringType(serialize_when_none=False)
-    model = StringType(serialize_when_none=False)
-    serial_number = StringType(serialize_when_none=False)
-    cpu_model = ListType(default=[])
-    threads_per_core = IntType(default=0, serialize_when_none=False)
-    core_per_socket = IntType(default=0, serialize_when_none=False)
-    cpu_socket = IntType(default=0, serialize_when_none=False)
-    cpu_arch = StringType(serialize_when_none=False)
-    hyperthreading =  BooleanType(default=False, serialize_when_none=False)
-    bios_version = StringType(serialize_when_none=False)
-    bios_release_at = DateType(serialize_when_none=False)
-    is_vm = StringType(serialize_when_none=False)
-
-    # get_instance_type =
 '''
 {
   "id": "projects/bluese-cloudone-20200113/zones/asia-northeast3-a/machineTypes",
@@ -39,3 +20,12 @@ class Hardware(Model):
       "kind": "compute#machineType"
     },
 '''
+
+
+class Hardware(Model):
+    core = IntType(default=0)
+    memory = FloatType(default=0.0)
+    is_vm = StringType(default=True)
+    cpu_model = ListType(StringType(default=""))
+
+    # get_instance_type =

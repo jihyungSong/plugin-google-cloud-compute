@@ -29,24 +29,24 @@ class ServerData(Model):
 
 class Server(Model):
     name = StringType()
-    #server_id for later use.
     server_type = StringType(default='VM')
     os_type = StringType(choices=('LINUX', 'WINDOWS'))
-    provider = StringType(default='gcp')
+    provider = StringType(default='g????')
     primary_ip_address = StringType()
     ip_addresses = ListType(StringType())
-    region_code = StringType(default='gcp')
-    region_type = StringType(default='GCP')
+    region_code = StringType()
+    region_type = StringType(default='GOOGLE_CLOUD')
     nics = ListType(ModelType(NIC))
     disks = ListType(ModelType(Disk))
     data = ModelType(ServerData)
     _metadata = ModelType(ServerMetadata, serialized_name='metadata')
-    # reference = ModelType(ReferenceModel)
 
     @serializable
     def reference(self):
         return {
-            "resource_id": f"arn:aws:gcp_compute:{self.data.compute.region_name}:{self.data.compute.account_id}:instance/{self.data.compute.instance_id}",
-            "external_link": f"https://{self.data.compute.region_name}.console.aws.amazon.com/gcp_compute/v2/home?region={self.data.compute.region_name}#Instances:instanceId={self.data.compute.instance_id}"
+            "resource_id": "",
+            "external_link": f"https://{self.data.compute.region_name}.console..com/gcp_compute/v2/home?region={self.data.compute.region_name}#Instances:instanceId={self.data.compute.instance_id}"
+            # https://console.cloud.google.com/compute/instancesDetail/zones/asia-northeast3-a/instances/dk-instance01?project=bluese-cloudone-20200113&authuser=1
+
         }
 

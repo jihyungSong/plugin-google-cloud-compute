@@ -53,8 +53,8 @@ class GcpComputeConnector(BaseConnector):
             - token_uri: ...
             - ...
         """
-        credentials = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
         try:
+            credentials = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
             return googleapiclient.discovery.build('compute', 'v1', credentials=credentials)
         except Exception as e:
             print(e)

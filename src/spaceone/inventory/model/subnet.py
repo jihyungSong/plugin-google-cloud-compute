@@ -1,5 +1,6 @@
 from schematics import Model
-from schematics.types import StringType
+from schematics.types import StringType, ModelType
+from spaceone.inventory.model.vpc import VPC
 '''
 {
   "items": [
@@ -15,14 +16,17 @@ from schematics.types import StringType
       "privateIpGoogleAccess": false,
       "fingerprint": "bvkW3drQF1Y=",
       "allowSubnetCidrRoutesOverlap": false,
-      "purpose": "PRIVATE",
+      "purpose": "PRIVATE",                     # TODO: Puropose 가 뭔지 알아봅시다
       "kind": "compute#subnetwork"
     }
 }
 
 '''
 
-class SubnetWork(Model):
+class Subnet(Model):
     subnet_id = StringType()
     cidr = StringType()
     subnet_name = StringType()
+    gateway_address = StringType()
+    vpc = ModelType(VPC)
+    self_link = StringType()
