@@ -14,40 +14,32 @@ class ReferenceModel(Model):
 
 class ServerData(Model):
     os = ModelType(OS)
-    aws = ModelType(AWS)
+    #os.domain
+    gcp = ModelType(AWS)
     hardware = ModelType(Hardware)
-    security_group_rules = ListType(ModelType(SecurityGroupRule))
-    public_ip_address = StringType()
     compute = ModelType(Compute)
-    public_dns = StringType()
     load_balancers = ListType(ModelType(LoadBalancer))
+    security_group_rules = ListType(ModelType(SecurityGroupRule))
+    #public_ip_address = StringType()
+    #public_dns = StringType()
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
     auto_scaling_group = ModelType(AutoScalingGroup, serialize_when_none=False)
 
-    @serializable
-    def cloudwatch(self):
-        return {
-            "namespace": "AWS/EC2",
-            "dimensions": [
-                {
-                    "Name": "InstanceId",
-                    "Value": self.compute.instance_id
-                }
-            ],
-            "region_name": self.compute.region_name
-        }
-
 
 class Server(Model):
     name = StringType()
-    data = ModelType(ServerData)
-    nics = ListType(ModelType(NIC))
-    disks = ListType(ModelType(Disk))
-    ip_addresses = ListType(StringType())
+    #server_id for later use.
     server_type = StringType(default='VM')
     os_type = StringType(choices=('LINUX', 'WINDOWS'))
-    provider = StringType(default='aws')
+    provider = StringType(default='gcp')
+    primary_ip_address = StringType()
+    ip_addresses = ListType(StringType())
+    region_code = StringType(default='gcp')
+    region_type = StringType(default='GCP')
+    nics = ListType(ModelType(NIC))
+    disks = ListType(ModelType(Disk))
+    data = ModelType(ServerData)
     _metadata = ModelType(ServerMetadata, serialized_name='metadata')
     # reference = ModelType(ReferenceModel)
 

@@ -1,6 +1,6 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.compute import Compute
-from spaceone.inventory.model.aws import AWS
+from spaceone.inventory.model.gcp import AWS
 from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
 from spaceone.inventory.connector.gcp_compute_connector import GcpComputeConnector

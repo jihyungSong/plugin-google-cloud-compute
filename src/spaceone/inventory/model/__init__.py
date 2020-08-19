@@ -1,5 +1,5 @@
 from spaceone.inventory.model.auto_scaling_group import AutoScalingGroup
-from spaceone.inventory.model.aws import AWS
+from spaceone.inventory.model.gcp import AWS
 from spaceone.inventory.model.compute import Compute
 from spaceone.inventory.model.disk import Disk
 from spaceone.inventory.model.hardware import Hardware
