@@ -1,5 +1,5 @@
 from spaceone.core.manager import BaseManager
-from spaceone.inventory.model.security_group_rule import SecurityGroupRule
+from spaceone.inventory.model.firewall_rule import FirewallRule
 
 
 class SecurityGroupRuleManager(BaseManager):

@@ -1,27 +1,26 @@
 from schematics import Model
 from schematics.types import serializable, ModelType, ListType, StringType
-from spaceone.inventory.model import OS, AWS, Hardware, SecurityGroupRule, Compute, LoadBalancer, VPC, Subnet, \
-    AutoScalingGroup, NIC, Disk, ServerMetadata, Region
+from spaceone.inventory.model import OS, GoogleCloud, Hardware, FirewallRule, Compute, LoadBalancer, VPC, Subnet, \
+    AutoScalingGroup, NIC, Disk, ServerMetadata
 
 
 class ReferenceModel(Model):
     class Option:
         serialize_when_none = False
-
     resource_id = StringType(required=False, serialize_when_none=False)
     external_link = StringType(required=False, serialize_when_none=False)
 
 
 class ServerData(Model):
+    # os.domain
+    # public_ip_address = StringType()
+    # public_dns = StringType()
     os = ModelType(OS)
-    #os.domain
-    gcp = ModelType(AWS)
+    gcp = ModelType(GoogleCloud)
     hardware = ModelType(Hardware)
     compute = ModelType(Compute)
     load_balancers = ListType(ModelType(LoadBalancer))
-    security_group_rules = ListType(ModelType(SecurityGroupRule))
-    #public_ip_address = StringType()
-    #public_dns = StringType()
+    security_group_rules = ListType(ModelType(FirewallRule))
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
     auto_scaling_group = ModelType(AutoScalingGroup, serialize_when_none=False)
@@ -31,7 +30,7 @@ class Server(Model):
     name = StringType()
     server_type = StringType(default='VM')
     os_type = StringType(choices=('LINUX', 'WINDOWS'))
-    provider = StringType(default='g????')
+    provider = StringType(default='google_cloud')
     primary_ip_address = StringType()
     ip_addresses = ListType(StringType())
     region_code = StringType()
@@ -45,8 +44,6 @@ class Server(Model):
     def reference(self):
         return {
             "resource_id": "",
-            "external_link": f"https://{self.data.compute.region_name}.console..com/gcp_compute/v2/home?region={self.data.compute.region_name}#Instances:instanceId={self.data.compute.instance_id}"
-            # https://console.cloud.google.com/compute/instancesDetail/zones/asia-northeast3-a/instances/dk-instance01?project=bluese-cloudone-20200113&authuser=1
-
+            "external_link": f"https://console.cloud.google.com/compute/instancesDetail/zones/{self.zone}instances/dk-instance01?project={self.data.compute.account}"
         }
 

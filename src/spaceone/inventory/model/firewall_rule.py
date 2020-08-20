@@ -2,7 +2,6 @@ from schematics import Model
 from schematics.types import StringType, IntType
 
 #Firewall
-
 '''
 {
   "id": "projects/bluese-cloudone-20200113/global/firewalls",
@@ -491,11 +490,10 @@ from schematics.types import StringType, IntType
   "selfLink": "https://www.googleapis.com/compute/beta/projects/bluese-cloudone-20200113/global/firewalls",
   "kind": "compute#firewallList"
 }
-
-
 '''
 
-class SecurityGroupRule(Model):
+
+class FirewallRule(Model):
     priority = IntType(serialize_when_none=False)
     protocol = StringType()
     remote = StringType()
