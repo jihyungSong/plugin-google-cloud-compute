@@ -23,6 +23,7 @@ from spaceone.inventory.model.vpc import VPC
 
 '''
 
+
 class Subnet(Model):
     subnet_id = StringType()
     cidr = StringType()

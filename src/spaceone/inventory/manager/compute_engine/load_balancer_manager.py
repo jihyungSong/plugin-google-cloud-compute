@@ -1,6 +1,6 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.load_balancer import LoadBalancer
-from spaceone.inventory.connector.gcp_compute_connector import GcpComputeConnector
+from spaceone.inventory.connector.vm_connector import GcpComputeConnector
 
 
 class LoadBalancerManager(BaseManager):

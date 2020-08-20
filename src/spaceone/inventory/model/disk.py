@@ -36,7 +36,8 @@ class DiskTags(Model):
     encrypted = BooleanType(default=True)
     read_iops = FloatType(serialize_when_none=False)
     write_iops = FloatType(serialize_when_none=False)
-    labels = DictType(serialize_when_none=False)
+    labels = DictType(StringType, default={}, serialize_when_none=False)
+
 
 
 class Disk(Model):

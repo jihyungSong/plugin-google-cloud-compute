@@ -214,8 +214,6 @@ from schematics.types import StringType, ModelType, DateTimeType
 }
 
 '''
-# 인스턴스 템플릿
-# 인스턴스 그룹
 
 
 class InstanceGroup(Model):
@@ -223,17 +221,6 @@ class InstanceGroup(Model):
     self_link = StringType()
     name = StringType()
     instance_template_name = StringType()
-
-
-#Autoscaling
-#Autoscaling_mode
-
-'''
-By Metric
-CPU
-Loadblancer
-StackDrive
-'''
 
 class AutoScaler(Model):
     id = StringType()

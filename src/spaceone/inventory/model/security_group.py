@@ -493,7 +493,7 @@ from schematics.types import StringType, IntType
 '''
 
 
-class FirewallRule(Model):
+class SecurityGroup(Model):
     priority = IntType(serialize_when_none=False)
     protocol = StringType()
     remote = StringType()                                   # mimic

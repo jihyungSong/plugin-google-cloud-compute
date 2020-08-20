@@ -148,21 +148,20 @@ class CollectorService(BaseService):
         print(f'############## TOTAL FINISHED {time.time() - start_time} Sec ##################')
 
     def set_params_for_regions(self, params):
-        params_for_regions = []
+        params_for_zones = []
 
-        (query, instance_ids, filter_region_name) = self._check_query(params['filter'])
-
-        target_regions = self.get_all_regions(params['secret_data'], filter_region_name)
+        (query, instance_ids, filter_zone_name) = self._check_query(params['filter'])
+        target_regions = self.get_all_zones(params.get('secret_data', ''), filter_zone_name)
 
         for target_region in target_regions:
-            params_for_regions.append({
+            params_for_zones.append({
                 'region_name': target_region,
                 'query': query,
                 'secret_data': params['secret_data'],
                 'instance_ids': instance_ids
             })
 
-        return params_for_regions
+        return params_for_zones
 
     def _check_query(self, query):
         """
@@ -195,8 +194,8 @@ class CollectorService(BaseService):
 
         return (filters, instance_ids, region_name)
 
-    def get_all_regions(self, secret_data, filter_region_name):
-        """ Find all region name
+    def get_all_zones(self, secret_data, filter_zone_name):
+        """ Find all zone name
         Args:
             secret_data: secret data
             region_name (list): list of region_name if wanted
@@ -207,9 +206,9 @@ class CollectorService(BaseService):
         if 'region_name' in secret_data:
             return [secret_data['region_name']]
 
-        if len(filter_region_name) > 0:
-            return filter_region_name
+        if len(filter_zone_name) > 0:
+            return filter_zone_name
 
-        regions = self.collector_manager.list_regions(secret_data, DEFAULT_REGION)
-        regions_name_list = [region.get('name', None) for region in regions if region.get('name') is not None]
+        zones = self.collector_manager.list_regions(secret_data, DEFAULT_REGION)
+        regions_name_list = [zone.get('name', None) for zone in zones if zone.get('name') is not None]
         return regions_name_list

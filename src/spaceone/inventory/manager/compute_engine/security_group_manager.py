@@ -1,5 +1,5 @@
 from spaceone.core.manager import BaseManager
-from spaceone.inventory.model.firewall_rule import FirewallRule
+from spaceone.inventory.model.security_group import SecurityGroup
 
 
 class SecurityGroupRuleManager(BaseManager):
@@ -37,11 +37,11 @@ class SecurityGroupRuleManager(BaseManager):
 
                 for ip_range in inbound_rule.get('IpRanges', []):
                     sg_data.update(self.set_ip_range_data(ip_range))
-                    sg_rules.append(SecurityGroupRule(sg_data, strict=False))
+                    sg_rules.append(SecurityGroup(sg_data, strict=False))
 
                 for group_pair in inbound_rule.get('UserIdGroupPairs', []):
                     sg_data.update(self.set_group_pairs_data(group_pair))
-                    sg_rules.append(SecurityGroupRule(sg_data, strict=False))
+                    sg_rules.append(SecurityGroup(sg_data, strict=False))
 
             # OUTBOUND
             for outbound_rules in match_sg.get('IpPermissionsEgress', []):
@@ -49,11 +49,11 @@ class SecurityGroupRuleManager(BaseManager):
 
                 for ip_range in outbound_rules.get('IpRanges', []):
                     sg_data.update(self.set_ip_range_data(ip_range))
-                    sg_rules.append(SecurityGroupRule(sg_data, strict=False))
+                    sg_rules.append(SecurityGroup(sg_data, strict=False))
 
                 for group_pair in outbound_rules.get('UserIdGroupPairs', []):
                     sg_data.update(self.set_group_pairs_data(group_pair))
-                    sg_rules.append(SecurityGroupRule(sg_data, strict=False))
+                    sg_rules.append(SecurityGroup(sg_data, strict=False))
 
         return sg_rules
 

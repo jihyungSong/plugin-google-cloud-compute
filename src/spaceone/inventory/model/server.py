@@ -1,7 +1,7 @@
 from schematics import Model
 from schematics.types import serializable, ModelType, ListType, StringType
-from spaceone.inventory.model import OS, GoogleCloud, Hardware, FirewallRule, Compute, LoadBalancer, VPC, Subnet, \
-    AutoScalingGroup, NIC, Disk, ServerMetadata
+from spaceone.inventory.model import OS, GoogleCloud, Hardware, SecurityGroup, Compute, LoadBalancer, VPC, Subnet, \
+    AutoScaler, NIC, Disk, ServerMetadata
 
 
 class ReferenceModel(Model):
@@ -12,18 +12,15 @@ class ReferenceModel(Model):
 
 
 class ServerData(Model):
-    # os.domain
-    # public_ip_address = StringType()
-    # public_dns = StringType()
     os = ModelType(OS)
     gcp = ModelType(GoogleCloud)
     hardware = ModelType(Hardware)
     compute = ModelType(Compute)
     load_balancers = ListType(ModelType(LoadBalancer))
-    security_group_rules = ListType(ModelType(FirewallRule))
+    security_group_rules = ListType(ModelType(SecurityGroup))
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
-    auto_scaling_group = ModelType(AutoScalingGroup, serialize_when_none=False)
+    auto_scaler = ModelType(AutoScaler, serialize_when_none=False)
 
 
 class Server(Model):

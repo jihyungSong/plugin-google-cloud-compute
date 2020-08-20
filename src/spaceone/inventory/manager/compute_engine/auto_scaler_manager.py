@@ -1,8 +1,8 @@
 from spaceone.core.manager import BaseManager
-from spaceone.inventory.model.auto_scaling_group import AutoScalingGroup
+from spaceone.inventory.model.auto_scaler import AutoScaler
 
 
-class AutoScalingGroupManager(BaseManager):
+class AutoScalerManager(BaseManager):
 
     def __init__(self, params, ec2_connector=None):
         self.params = params
@@ -49,7 +49,7 @@ class AutoScalingGroupManager(BaseManager):
                     'launch_template': match_autoscaling_group.get('LaunchTemplate')
                 })
 
-            return AutoScalingGroup(auto_scaling_group_data, strict=False)
+            return AutoScaler(auto_scaling_group_data, strict=False)
         else:
             return None
 

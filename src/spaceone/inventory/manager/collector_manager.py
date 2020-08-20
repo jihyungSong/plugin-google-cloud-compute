@@ -5,7 +5,7 @@ import logging
 from pprint import pprint
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GcpComputeConnector
-from spaceone.inventory.manager.gcp_compute import ComputeInstanceManager, AutoScalingGroupManager, LoadBalancerManager, \
+from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
     DiskManager, NICManager, VPCManager, SecurityGroupRuleManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
 from spaceone.inventory.model.server import Server
@@ -31,57 +31,57 @@ class CollectorManager(BaseManager):
     def list_regions(self, secret_data, region_name):
         gcp_compute_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
         gcp_compute_connector.set_client(secret_data, region_name)
-        return gcp_compute_connector.list_regions(secret_data)
+        return gcp_compute_connector.list_zones(secret_data)
 
     def list_instances(self, params):
         server_vos = []
-        gcp_compute_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
-        gcp_compute_connector.set_client(params['secret_data'], params['region_name'])
+        vm_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
+        vm_connector.set_client(params['secret_data'], params['region_name'])
 
         instance_filter = {}
 
         if 'instance_ids' in params and len(params.get('instance_ids', [])) > 0:
             instance_filter.update({'filter': [{'key': 'id', 'values': params['instance_ids']}]})
 
-        instances, project_id = gcp_compute_connector.list_instances(**instance_filter)
+        instances, project_id = vm_connector.list_instances(**instance_filter)
 
         print(f'===== [{params["region_name"]}]  /  INSTANCE COUNT : {len(instances)}')
 
         if len(instances) > 0:
             # Get Instance Type for GCP
-            instance_types = gcp_compute_connector.list_instance_types()
+            instance_types = vm_connector.list_instance_types()
 
             # Image
-            images = gcp_compute_connector.list_images(ImageIds=self.get_image_ids(instances))
+            images = vm_connector.list_images(ImageIds=self.get_image_ids(instances))
 
             # Autoscaling group list
-            auto_scaling_groups = gcp_compute_connector.list_auto_scaling_groups()
-            launch_configurations = gcp_compute_connector.list_launch_configurations()
+            auto_scaling_groups = vm_connector.list_auto_scaling_groups()
+            launch_configurations = vm_connector.list_launch_configurations()
 
             # LB list
-            load_balancers = gcp_compute_connector.list_load_balancers()
-            target_groups = gcp_compute_connector.list_target_groups()
+            load_balancers = vm_connector.list_load_balancers()
+            target_groups = vm_connector.list_target_groups()
 
             for target_group in target_groups:
-                target_healths = gcp_compute_connector.list_target_health(target_group.get('TargetGroupArn'))
+                target_healths = vm_connector.list_target_health(target_group.get('TargetGroupArn'))
                 target_group['target_healths'] = target_healths
 
             # VPC
-            vpcs = gcp_compute_connector.list_vpcs()
-            subnets = gcp_compute_connector.list_subnets()
+            vpcs = vm_connector.list_vpcs()
+            subnets = vm_connector.list_subnets()
 
             # Volume
-            volumes = gcp_compute_connector.list_volumes()
+            volumes = vm_connector.list_volumes()
 
             # IP
-            eips = gcp_compute_connector.list_elastic_ips()
+            eips = vm_connector.list_elastic_ips()
 
             # Security Group
-            sgs = gcp_compute_connector.list_security_groups()
+            sgs = vm_connector.list_security_groups()
 
-            ins_manager: ComputeInstanceManager = ComputeInstanceManager(params, gcp_compute_connector=gcp_compute_connector)
-            asg_manager: AutoScalingGroupManager = AutoScalingGroupManager(params)
-            elb_manager: LoadBalancerManager = LoadBalancerManager(params, gcp_compute_connector=gcp_compute_connector)
+            ins_manager: VMInstanceManager = VMInstanceManager(params, gcp_compute_connector=vm_connector)
+            asg_manager: AutoScalerManager = AutoScalerManager(params)
+            elb_manager: LoadBalancerManager = LoadBalancerManager(params, gcp_compute_connector=vm_connector)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
             vpc_manager: VPCManager = VPCManager(params)
@@ -127,7 +127,7 @@ class CollectorManager(BaseManager):
                     'ip_addresses': self.merge_ip_addresses(server_data)
                 })
 
-                server_data['data']['compute']['account_id'] = account_id
+                server_data['data']['compute']['account'] = project_id
 
                 server_data.update({
                     '_metadata': meta_manager.get_metadata(),

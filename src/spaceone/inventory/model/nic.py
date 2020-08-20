@@ -35,4 +35,4 @@ class NIC(Model):
 
     mac_address = StringType(default="")
     public_ip_address = StringType()
-    tags = ModelType(DictType, default={})
+    tags = DictType(StringType, default={})

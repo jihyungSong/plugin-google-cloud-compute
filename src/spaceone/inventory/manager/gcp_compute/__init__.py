@@ -1,9 +1,0 @@
-from spaceone.inventory.manager.gcp_compute.auto_scaling_group_manager import AutoScalingGroupManager
-from spaceone.inventory.manager.gcp_compute.load_balancer_manager import LoadBalancerManager
-from spaceone.inventory.manager.gcp_compute.vpc_manager import VPCManager
-from spaceone.inventory.manager.gcp_compute.gcp_compute_instance_manager import ComputeInstanceManager
-from spaceone.inventory.manager.gcp_compute.nic_manager import NICManager
-from spaceone.inventory.manager.gcp_compute.disk_manager import DiskManager
-from spaceone.inventory.manager.gcp_compute.security_group_rule_manager import SecurityGroupRuleManager
-from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
-

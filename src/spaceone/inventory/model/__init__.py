@@ -1,4 +1,4 @@
-from spaceone.inventory.model.auto_scaling_group import AutoScalingGroup
+from spaceone.inventory.model.auto_scaler import AutoScaler
 from spaceone.inventory.model.google_cloud import GoogleCloud
 from spaceone.inventory.model.compute import Compute
 from spaceone.inventory.model.disk import Disk
@@ -6,7 +6,7 @@ from spaceone.inventory.model.hardware import Hardware
 from spaceone.inventory.model.load_balancer import LoadBalancer
 from spaceone.inventory.model.nic import NIC
 from spaceone.inventory.model.os import OS
-from spaceone.inventory.model.firewall_rule import FirewallRule
+from spaceone.inventory.model.security_group import SecurityGroup
 from spaceone.inventory.model.subnet import Subnet
 from spaceone.inventory.model.vpc import VPC
 from spaceone.inventory.model.region import Region

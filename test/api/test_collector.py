@@ -39,6 +39,7 @@ class TestCollector(TestCase):
         options = {
         }
         secret_data = _get_credentials()
+        print(secret_data)
         v_info = self.inventory.Collector.verify({'options': options, 'secret_data': secret_data})
         print_json(v_info)
 

@@ -1,15 +1,15 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.compute import Compute
-from spaceone.inventory.model.google_cloud import AWS
+from spaceone.inventory.model.google_cloud import GoogleCloud
 from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
-from spaceone.inventory.connector.gcp_compute_connector import GcpComputeConnector
+from spaceone.inventory.connector.vm_connector import VMConnector
 
-class ComputeInstanceManager(BaseManager):
+class VMInstanceManager(BaseManager):
 
-    def __init__(self, params, gcp_compute_connector=None):
+    def __init__(self, params, vm_connector=None):
         self.params = params
-        self.gcp_compute_connector: GcpComputeConnector = gcp_compute_connector
+        self.vm_connector: VMConnector = vm_connector
 
     def get_server_info(self, instance, itypes, images, eips):
         '''
@@ -60,14 +60,14 @@ class ComputeInstanceManager(BaseManager):
 
         server_dic = self.get_server_dic(instance)
         os_data = self.get_os_data(instance, match_image, self.get_os_type(instance))
-        aws_data = self.get_aws_data(instance)
+        google_cloud_data = self.get_google_cloud_data(instance)
         hardware_data = self.get_hardware_data(instance, itypes)
         compute_data = self.get_compute_data(instance, match_image, eips)
 
         server_dic.update({
             'data': {
                 'os': os_data,
-                'aws': aws_data,
+                'aws': google_cloud_data,
                 'hardware': hardware_data,
                 'compute': compute_data,
                 'public_dns': instance.get('PublicDnsName', ''),
@@ -94,15 +94,15 @@ class ComputeInstanceManager(BaseManager):
 
         return OS(os_data, strict=False)
 
-    def get_aws_data(self, instance):
-        aws_data = {
+    def get_google_cloud_data(self, instance):
+        google_cloud_data = {
             'ebs_optimized': instance.get('EbsOptimized', False),
             'iam_instance_profile': instance.get('IamInstanceProfile'),
             'lifecycle': instance.get('InstanceLifecycle', 'scheduled'),
             'tags': instance.get('Tags', [])
         }
 
-        return AWS(aws_data, strict=False)
+        return GoogleCloud(google_cloud_data, strict=False)
 
     def get_hardware_data(self, instance, itypes):
         hardware_data = {}
