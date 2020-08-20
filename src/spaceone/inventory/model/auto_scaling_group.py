@@ -1,5 +1,5 @@
 from schematics import Model
-from schematics.types import StringType, ModelType
+from schematics.types import StringType, ModelType, DateTimeType
 '''
 {
   "id": "projects/bluese-cloudone-20200113/zones/asia-northeast3-a/instanceGroupManagers",
@@ -216,12 +216,14 @@ from schematics.types import StringType, ModelType
 '''
 # 인스턴스 템플릿
 # 인스턴스 그룹
-class InstanceTemplate(Model):
-    name = StringType()
 
 
 class InstanceGroup(Model):
+    id = StringType()
+    self_link = StringType()
     name = StringType()
+    instance_template_name = StringType()
+
 
 #Autoscaling
 #Autoscaling_mode
@@ -233,7 +235,8 @@ Loadblancer
 StackDrive
 '''
 
-class AutoScalingGroup(Model):
+class AutoScaler(Model):
+    id = StringType()
+    self_link = StringType()
     name = StringType()
-    instance_template = ModelType(InstanceTemplate, serialize_when_none=False)
     instance_group = ModelType(InstanceGroup, serialize_when_none=False)
