@@ -12,16 +12,18 @@ class VPCManager(BaseManager):
     def get_vpc_info(self, vpc_id, subnet_id, vpcs, subnets, region_name):
         '''
         vpc_data = {
-            "vpc_arn": "",
             "vpc_id": "",
-            "cidr": "",
-            "vpc_name": ""
+            "vpc_name": "",
+            "description": "",
+            "self_link": ""
         }
 
         subnet_data = {
-            "subnet_name": "",
-            "subnet_arn": "",
             "subnet_id": "",
+            "subnet_name": "",
+            "self_link": "",
+            "gateway_address": "",
+            "vpc" : VPC
             "cidr": ""
         }
         '''

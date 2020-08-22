@@ -102,6 +102,7 @@ from schematics.types import StringType
 }
 '''
 
+
 class VPC(Model):
     vpc_id = StringType()
     vpc_name = StringType(default="")

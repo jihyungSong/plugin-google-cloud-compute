@@ -1,4 +1,4 @@
-__all__ = ["GcpComputeConnector"]
+__all__ = ["VMConnector"]
 
 import logging
 import os
@@ -83,13 +83,18 @@ class VMConnector(BaseConnector):
         query = self.generate_key_query('filter', self._get_filter_to_params(**query), '', is_default=True, **query)
         result = self.client.instances().list(**query).execute()
         compute_instances = result.get('items', [])
-        return compute_instances, self.project_id, self.region
+        return compute_instances, self.project_id
 
     def list_instance_types(self, **query):
-        query = self.generate_query(is_paginate=True, **query)
+        query = self.generate_query(is_default=True, **query)
         result = self.client.machineTypes().list(**query).execute()
         instance_types = result.get('items', [])
         return instance_types
+
+    def list_url_maps(self, **query):
+        response = self.client.urlMaps().list(project=self.project_id).execute()
+        url_map = response.get('items', [])
+        return url_map
 
     def list_vpc(self, **query):
         response = self.client.networks().list(project=self.project_id).execute()

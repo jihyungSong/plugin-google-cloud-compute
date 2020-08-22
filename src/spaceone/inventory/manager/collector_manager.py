@@ -4,7 +4,7 @@ import time
 import logging
 from pprint import pprint
 from spaceone.core.manager import BaseManager
-from spaceone.inventory.connector import GcpComputeConnector
+from spaceone.inventory.connector import VMConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
     DiskManager, NICManager, VPCManager, SecurityGroupRuleManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
@@ -23,21 +23,22 @@ class CollectorManager(BaseManager):
     def verify(self, options, secret_data):
         """ Check connection
         """
-        gcp_compute_connector = self.locator.get_connector('GcpComputeConnector')
-        r = gcp_compute_connector.verify(options, secret_data)
+        vm_connector = self.locator.get_connector('VMConnector')
+        r = vm_connector.verify(options, secret_data)
         # ACTIVE/UNKNOWN
         return r
 
     def list_regions(self, secret_data, region_name):
-        gcp_compute_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
-        gcp_compute_connector.set_client(secret_data, region_name)
-        return gcp_compute_connector.list_zones(secret_data)
+        vm_connector: VMConnector = self.locator.get_connector('VMConnector')
+        vm_connector.set_client(secret_data, region_name)
+        return vm_connector.list_zones(secret_data)
 
     def list_instances(self, params):
         server_vos = []
-        vm_connector: GcpComputeConnector = self.locator.get_connector('GcpComputeConnector')
-        vm_connector.set_client(params['secret_data'], params['region_name'])
+        vm_connector: VMConnector = self.locator.get_connector('VMConnector')
+        zone = params['region_name']
 
+        vm_connector.set_client(params['secret_data'], zone)
         instance_filter = {}
 
         if 'instance_ids' in params and len(params.get('instance_ids', [])) > 0:
@@ -49,22 +50,18 @@ class CollectorManager(BaseManager):
 
         if len(instances) > 0:
             # Get Instance Type for GCP
+
+            instance_group = vm_connector.list_instance_group_manager()
             instance_types = vm_connector.list_instance_types()
 
             # Image
-            images = vm_connector.list_images(ImageIds=self.get_image_ids(instances))
+            images = vm_connector.list_images()
 
             # Autoscaling group list
-            auto_scaling_groups = vm_connector.list_auto_scaling_groups()
-            launch_configurations = vm_connector.list_launch_configurations()
+            auto_scaler = vm_connector.list_auto_scaler()
 
             # LB list
             load_balancers = vm_connector.list_load_balancers()
-            target_groups = vm_connector.list_target_groups()
-
-            for target_group in target_groups:
-                target_healths = vm_connector.list_target_health(target_group.get('TargetGroupArn'))
-                target_group['target_healths'] = target_healths
 
             # VPC
             vpcs = vm_connector.list_vpcs()
@@ -73,15 +70,12 @@ class CollectorManager(BaseManager):
             # Volume
             volumes = vm_connector.list_volumes()
 
-            # IP
-            eips = vm_connector.list_elastic_ips()
-
             # Security Group
             sgs = vm_connector.list_security_groups()
 
-            ins_manager: VMInstanceManager = VMInstanceManager(params, gcp_compute_connector=vm_connector)
+            ins_manager: VMInstanceManager = VMInstanceManager(params, vm_connector=vm_connector)
             asg_manager: AutoScalerManager = AutoScalerManager(params)
-            elb_manager: LoadBalancerManager = LoadBalancerManager(params, gcp_compute_connector=vm_connector)
+            elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=vm_connector)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
             vpc_manager: VPCManager = VPCManager(params)
@@ -93,8 +87,7 @@ class CollectorManager(BaseManager):
                 instance_ip = instance.get('PrivateIpAddress')
 
                 server_data = ins_manager.get_server_info(instance, instance_types, images, eips)
-                auto_scaling_group_vo = asg_manager.get_auto_scaling_info(instance_id, auto_scaling_groups,
-                                                                          launch_configurations)
+                auto_scaling_group_vo = asg_manager.get_auto_scaling_info(instance_id, auto_scaling_groups)
 
                 load_balancer_vos = elb_manager.get_load_balancer_info(load_balancers, target_groups,
                                                                        instance_id, instance_ip)
