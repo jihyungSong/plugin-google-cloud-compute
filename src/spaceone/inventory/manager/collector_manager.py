@@ -36,9 +36,9 @@ class CollectorManager(BaseManager):
     def list_instances(self, params):
         server_vos = []
         vm_connector: VMConnector = self.locator.get_connector('VMConnector')
-        zone = params['region_name']
+        vm_connector.set_client(params['secret_data'], params['region_name'])
+        current_vo = self._get_simplified_vo(vm_connector)
 
-        vm_connector.set_client(params['secret_data'], zone)
         instance_filter = {}
 
         if 'instance_ids' in params and len(params.get('instance_ids', [])) > 0:
@@ -75,8 +75,8 @@ class CollectorManager(BaseManager):
             security_groups = vm_connector.list_firewall()
 
             # call_up all the managers
-            ins_manager: VMInstanceManager = VMInstanceManager(params, vm_connector=vm_connector)
-            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params)
+            vm_instance_manager: VMInstanceManager = VMInstanceManager(params, vm_connector=vm_connector)
+            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params, vm_connector=vm_connector)
             elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=vm_connector)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
@@ -85,19 +85,14 @@ class CollectorManager(BaseManager):
             meta_manager: MetadataManager = MetadataManager()
 
             for instance in instances:
-                instance_id = instance.get('InstanceId')
-                instance_ip = instance.get('PrivateIpAddress')
-
-                server_data = ins_manager.get_server_info(instance, instance_types, images)
-
-                auto_scaling_group_vo = asg_manager.get_auto_scaling_info(instance_id, auto_scaling_groups)
+                server_data = vm_instance_manager.get_server_info(instance, instance_types, disks, current_vo)
+                auto_scaler_vo = auto_scaler_manager.get_auto_scaler_info(instance, instance_group, auto_scaler)
 
                 load_balancer_vos = elb_manager.get_load_balancer_info(load_balancers, target_groups,
                                                                        instance_id, instance_ip)
 
                 disk_vos = disk_manager.get_disk_info(self.get_volume_ids(instance), volumes)
-                vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance.get('VpcId'), instance.get('SubnetId'),
-                                                             vpcs, subnets, params['region_name'])
+                vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
 
                 nic_vos = nic_manager.get_nic_info(instance.get('NetworkInterfaces'), subnet_vo)
 
@@ -113,7 +108,7 @@ class CollectorManager(BaseManager):
                 server_data['data'].update({
                     'load_balancers': load_balancer_vos,
                     'security_group_rules': sg_rules_vos,
-                    'auto_scaling_group': auto_scaling_group_vo,
+                    'auto_scaling_group': auto_scaler_vo,
                     'vpc': vpc_vo,
                     'subnet': subnet_vo,
                 })
@@ -166,6 +161,14 @@ class CollectorManager(BaseManager):
             merge_ip_address.append(server_data['data']['public_ip_address'])
 
         return list(set(merge_ip_address))
+
+    @staticmethod
+    def _get_simplified_vo(vm_connector):
+        return {
+            'project_id': vm_connector.get('project_id', ''),
+            'region': vm_connector.get('region', ''),
+            'zone': vm_connector.get('zone', '')
+        }
 
     @staticmethod
     def get_region_from_result(result):

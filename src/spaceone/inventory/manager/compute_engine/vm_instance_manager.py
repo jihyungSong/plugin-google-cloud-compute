@@ -3,40 +3,49 @@ from spaceone.inventory.model.compute import Compute
 from spaceone.inventory.model.google_cloud import GoogleCloud
 from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
-from spaceone.inventory.connector.vm_connector import VMConnector
+
 
 class VMInstanceManager(BaseManager):
-
-    def __init__(self, params, vm_connector=None):
+    def __init__(self, params):
         self.params = params
-        self.vm_connector: VMConnector = vm_connector
 
-    def get_server_info(self, instance, itypes, images, eips):
+    def get_server_info(self, instance, instance_types, disks, current_vo):
         '''
         server_data = {
-            "os_type": "LINUX" | "WINDOWS"
-            "name": ''
-            "ip_addresses": []
+            "name": '',
+            "server_type": 'VM',
+            "os_type": "LINUX" | "WINDOWS",
+            "provider": "google_cloud",
+            "ip_addresses": [],
+            "primary_ip_address": '',
+            "ip_addresses": '',
+            "region_code": '',
+            "region_type": ''
             "data":  {
                 "os": {
+                    "os_arch": "",
                     "details": "",
                     "os_distro": "",
-                    "os_arch": "",
                 },
                 "google_cloud": {
-                    "ebs_optimized": "",
-                    "iam_instance_profile": {
-                        "id": "",
-                        "arn": ""
+                    "self_link": "",
+                    "fingerprint": "",
+                    "reservation_affinity": "",
+                    "deletion_protection": "",
+                    "scheduling": {
+                        'on_host_maintenance': '',
+                        'automatic_restart': '',
+                        'preemptible': '',
                     },
-                    "lifecycle": "spot" | "scheduled",
-                    "tags": {},
+                    "labels": [{
+                        key: '',
+                        value: ''
+                    }]
                 },
                 "hardware": {
                     "core": 0,
                     "memory": 0
                 },
-                "public_ip_address": "",
                 "compute": {
                     "eip": [],
                     "keypair": "",
@@ -51,179 +60,207 @@ class VMInstanceManager(BaseManager):
                     "image": "",
                     "account_id": "",
                 },
-                "public_dns": ""
             }
         }
         '''
 
-        match_image = self.match_image(instance.get('ImageId'), images)
-
-        server_dic = self.get_server_dic(instance)
-        os_data = self.get_os_data(instance, match_image, self.get_os_type(instance))
+        os_type, os_data = self.get_os_type_and_data(instance)
+        server_dic = self.get_server_dic(instance, os_type, current_vo)
         google_cloud_data = self.get_google_cloud_data(instance)
-        hardware_data = self.get_hardware_data(instance, itypes)
-        compute_data = self.get_compute_data(instance, match_image, eips)
+        hardware_data = self.get_hardware_data(instance, instance_types)
+        compute_data = self.get_compute_data(instance, disks, current_vo)
 
         server_dic.update({
             'data': {
                 'os': os_data,
-                'aws': google_cloud_data,
+                'gcp': google_cloud_data,
                 'hardware': hardware_data,
-                'compute': compute_data,
-                'public_dns': instance.get('PublicDnsName', ''),
-                'public_ip_address': instance.get('PublicIpAddress', '')
+                'compute': compute_data
             }
         })
 
         return server_dic
 
-    def get_server_dic(self, instance):
+    def get_server_dic(self, instance, os_type, current_vo):
         server_data = {
-            'name': self.generate_name(instance),
-            'os_type': self.get_os_type(instance)
+            'name': instance.get('name', ''),
+            'server_type': 'VM',
+            'os_type': os_type,
+            'provider': 'google_cloud',
+            'primary_ip_address': self._get_primary_ip_address(instance),
+            'ip_addresses': self._get_ip_addresses(instance),
+            'region_code': current_vo.get('region', ''),
+            'region_type': 'GOOGLE_CLOUD'
         }
 
         return server_data
 
-    def get_os_data(self, instance, image, os_type):
+    def get_os_type_and_data(self, instance):
         os_dists = instance.get("licenses", [])
-        for os_dist in os_dists:
-            os_items = os_dist.split("/")
+        os_type = "LINUX"
+        os_identity = ''
 
-            ret_dic['data']['os']["os_version"] = os_items[-1]
-            ret_dic['data']['os']["os_arch"] = ""
-
-            if "windows" in ret_dic['data']['os']["os_version"]:
-                ret_dic["os_type"] = "WINDOWS"
-            else:
-                ret_dic["os_type"] = "LINUX"
+        for idx, val in enumerate(os_dists):
+            os_items = val.split("/")
+            os_identity = os_items[-1].lower()
+            if idx == 0:
+                if "windows" in os_identity:
+                    os_type = "WINDOWS"
+                break
 
         os_data = {
-            'details': image.get('Description', ''),
-            'os_distro': self.get_os_distro(image.get('Name', ''), os_type),
-            'os_arch': image.get('Architecture', '')
+            'details': '',
+            'os_distro': os_identity,
+            'os_license': os_dists,
+            'os_arch': ''
         }
 
-        return OS(os_data, strict=False)
+        return os_type, OS(os_data, strict=False)
 
     def get_google_cloud_data(self, instance):
-        google_cloud_data = {
-            'ebs_optimized': instance.get('EbsOptimized', False),
-            'iam_instance_profile': instance.get('IamInstanceProfile'),
-            'lifecycle': instance.get('InstanceLifecycle', 'scheduled'),
-            'tags': instance.get('Tags', [])
+        google_cloud = {
+            "self_link": instance.get('selfLink', ''),
+            "fingerprint": instance.get('fingerprint', ''),
+            "reservation_affinity": self.get_reservation_affinity(instance),
+            "deletion_protection": instance.get('deletionProtection', False),
+            "scheduling": self.get_scheduling(instance),
+            "labels": self.get_labels(instance)
+        },
+
+        return GoogleCloud(google_cloud, strict=False)
+
+
+
+    def get_hardware_data(self, instance, instance_types):
+        '''
+        core = IntType(default=0)
+        memory = FloatType(default=0.0)
+        is_vm = StringType(default=True)
+        cpu_model = ListType(StringType(default=""))
+        '''
+        core, memory = self._get_core_and_memory(instance, instance_types)
+        hardware_data = {
+            'core': core,
+            'memory': memory,
+            'cpu_model': instance.get('cpuPlatform', ''),
+            'is_vm': True
         }
-
-        return GoogleCloud(google_cloud_data, strict=False)
-
-    def get_hardware_data(self, instance, itypes):
-        hardware_data = {}
-        itype = self.match_instance_type(instance.get('InstanceType'), itypes)
-
-        if itype is not None:
-            hardware_data = {
-                'core': itype.get('VCpuInfo', {}).get('DefaultVCpus', 0),
-                'memory': round(float((itype.get('MemoryInfo', {}).get('SizeInMiB', 0))/1024), 2)  # 2.0
-            }
-
         return Hardware(hardware_data, strict=False)
 
-    def get_compute_data(self, instance, image, eips):
+    def get_compute_data(self, instance, disks, current_vo):
+        '''
+            {
+                'keypair': StringType(default="")
+                'az':StringType()                       # zone_name
+                'instance_id': StringType()
+                'instance_name': StringType(default='')
+                'instance_state':StringType(choices=('STAGING', 'RUNNING', 'STOPPING', 'REPAIRING'))
+                'instance_type' : StringType()
+                'account' : StringType()                  # Project_id
+                'image' : StringType()
+                'launched_at' : DateTimeType()
+                tags = DictType(StringType, default={})
+            }
+        '''
+
         compute_data = {
-            'eip': self.match_eips_from_instance_id(instance.get('InstanceId'), eips),
-            'keypair': instance.get('KeyName', ''),
-            'az': instance.get('Placement', {}).get('AvailabilityZone', ''),
-            'instance_state': instance.get('State', {}).get('Name'),
-            'termination_protection': self.get_termination_protection(instance.get('InstanceId')),
-            'instance_type': instance.get('InstanceType', ''),
-            'launched_at': instance.get('LaunchTime'),
-            'region_name': self.params['region_name'],
-            'instance_id': instance.get('InstanceId'),
-            'instance_name': self.generate_name(instance),
-            'security_groups': [sg.get('GroupName') for sg in instance.get('SecurityGroups', []) if sg.get('GroupName') is not None],
-            'account_id': '',
-            'image': image.get('Name', '')
+            'keypair': '',
+            'az': current_vo.get('zone', ''),            # zone_name
+            'instance_id': instance.get('id'),
+            'instance_name': instance.get('name', ''),
+            'instance_state': instance.get('status'),
+            'instance_type': self._get_instance_type(instance),
+            'account': current_vo.get('project_id', ''),
+            'image': self._get_image(instance, disks),
+            'launched_at': instance.get('creationTimestamp'),
+            'tags':  {},
         }
 
         return Compute(compute_data)
 
-    def get_termination_protection(self, instance_id):
-        return self.ec2_connector.list_instance_attribute(instance_id)
-
-    def get_os_distro(self, image_name, os_type):
-        if image_name == '':
-            return os_type.lower()
-        else:
-            return self.extract_os_distro(image_name, os_type)
-
-    def match_image(self, image_id, images):
-        for image in images:
-            if image.get('ImageId') == image_id:
-                return image
-
-        return {}
+    @staticmethod
+    def _get_images(instance, disks):
+        image = ''
+        name = instance.get('name')
+        for disk in disks:
+            if name == disk.get('name', ''):
+                image = disk.get('sourceImage', '')
+                break
+        return image
 
     @staticmethod
-    def match_eips_from_instance_id(instance_id, eips):
-        return [eip.get('PublicIp') for eip in eips if instance_id == eip.get('InstanceId', '')]
+    def _get_instance_type(instance):
+        machine_type = instance.get('machineType', '')
+        machine_split = machine_type.split('/')
+        return machine_split[-1]
 
     @staticmethod
-    def match_instance_type(instance_type, itypes):
-        for itype in itypes:
-            if itype.get('InstanceType') == instance_type:
-                return itype
+    def _get_core_and_memory(instance, instance_types):
+        machine_type = instance.get('machineType', '')
+        cpu = 0
+        memory = 0
+        for i_type in instance_types:
+            if i_type.get('selfLink', '') == machine_type:
+                cpu =  i_type.get('guestCpus')
+                memory = round(float((i_type.get('memoryMb', 0)) / 1024), 2)
+                break
 
-        return None
+        return cpu, memory
 
-    @staticmethod
-    def generate_name(resource):
-        for resource_tag in resource.get('Tags', []):
-            if resource_tag['Key'] == "Name":
-                return resource_tag["Value"]
-
-        return ''
 
     @staticmethod
-    def get_os_type(instance):
-        return instance.get('Platform', 'LINUX').upper()
+    def _get_primary_ip_address(instance):
+        primary_ip_address = ''
+        networks = instance.get('networkInterfaces', [])
+        for i, v in enumerate(networks):
+            if i == 0:
+                primary_ip_address = v.get('networkIP', '')
+                break
+        return primary_ip_address
+
 
     @staticmethod
-    def extract_os_distro(image_name, os_type):
-        if os_type == 'LINUX':
-            os_map = {
-                'suse': 'suse',
-                'rhel': 'redhat',
-                'cetnos': 'centos',
-                'fedora': 'fedora',
-                'ubuntu': 'ubuntu',
-                'debian': 'debia',
-                'amazon': 'amazonlinux',
-                'amzn': 'amazonlinux'
-            }
+    def _get_ip_addresses(instance):
+        ip_addresses = []
+        networks = instance.get('networkInterfaces', [])
+        for network in networks:
+            private_ip = network.get('networkIP', '')
+            access_configs = network.get('accessConfigs', [])
+            if private_ip != '':
+                ip_addresses.append(private_ip)
 
-            image_name.lower()
-            for key in os_map:
-                if key in image_name:
-                    return os_map[key]
+            for access_config in access_configs:
+                nat_ip = access_config.get('natIP', '')
+                if nat_ip != '':
+                    ip_addresses.append(nat_ip)
 
-            return 'linux'
+        return ip_addresses
 
-        elif os_type == 'WINDOWS':
-            os_distro_string = None
-            image_splits = image_name.split('-')
 
-            version_cmps = ['2016', '2019', '2012']
+    @staticmethod
+    def get_reservation_affinity(instance):
+        ra = instance.get('reservationAffinity', {})
+        return ra.get('consumeReservationType', '')
 
-            for version_cmp in version_cmps:
-                if version_cmp in image_splits:
-                    os_distro_string = f'win{version_cmp}'
+    @staticmethod
+    def get_scheduling(instance):
+        schedule = instance.get('scheduling', {})
+        scheduling = {
+            'on_host_maintenance': schedule.get('onHostMaintenance', 'MIGRATE'),
+            'automatic_restart': schedule.get('automaticRestart', True),
+            'preemptible': schedule.get('preemptible', False)
+        }
+        return scheduling
 
-            if os_distro_string is not None and 'R2_RTM' in image_splits:
-                os_distro_string = f'{os_distro_string}r2'
+    @staticmethod
+    def get_labels(instance):
+        labels = []
+        for k, v in instance.get('labels', {}).items():
+            labels.append({
+                'key': k,
+                'value': v
+            })
+        return labels
 
-            if os_distro_string is None:
-                os_distro_string = 'windows'
-
-            return os_distro_string
 
 

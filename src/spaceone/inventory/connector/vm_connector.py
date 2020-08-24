@@ -136,6 +136,13 @@ class VMConnector(BaseConnector):
         firewall = response.get('items', [])
         return firewall
 
+    def list_instance_from_instance_group(self, instance_group, **query):
+        response = self.client.instanceGroups().listInstances(project=self.project_id, zone=self.zone,
+                                                              instanceGroup=instance_group).execute()
+        firewall = response.get('items', [])
+        return firewall
+
+
     def list_instance_group_manager(self, **query):
         response = self.client.instanceGroupManagers().list(project=self.project_id, zone=self.zone).execute()
         firewall = response.get('items', [])
