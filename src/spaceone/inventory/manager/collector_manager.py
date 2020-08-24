@@ -67,26 +67,29 @@ class CollectorManager(BaseManager):
             vpcs = vm_connector.list_vpcs()
             subnets = vm_connector.list_subnets()
 
-            # Volume
-            volumes = vm_connector.list_volumes()
+            # disks
+            disks = vm_connector.list_disk()
+            disk_types = vm_connector.list_disk_types()
 
-            # Security Group
-            sgs = vm_connector.list_security_groups()
+            # Security Group(firewall)
+            security_groups = vm_connector.list_firewall()
 
+            # call_up all the managers
             ins_manager: VMInstanceManager = VMInstanceManager(params, vm_connector=vm_connector)
-            asg_manager: AutoScalerManager = AutoScalerManager(params)
+            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params)
             elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=vm_connector)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
             vpc_manager: VPCManager = VPCManager(params)
-            sg_manager: SecurityGroupRuleManager = SecurityGroupRuleManager(params)
+            security_group_manager: SecurityGroupRuleManager = SecurityGroupRuleManager(params)
             meta_manager: MetadataManager = MetadataManager()
 
             for instance in instances:
                 instance_id = instance.get('InstanceId')
                 instance_ip = instance.get('PrivateIpAddress')
 
-                server_data = ins_manager.get_server_info(instance, instance_types, images, eips)
+                server_data = ins_manager.get_server_info(instance, instance_types, images)
+
                 auto_scaling_group_vo = asg_manager.get_auto_scaling_info(instance_id, auto_scaling_groups)
 
                 load_balancer_vos = elb_manager.get_load_balancer_info(load_balancers, target_groups,

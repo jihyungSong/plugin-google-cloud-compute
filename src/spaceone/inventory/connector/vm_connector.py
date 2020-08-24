@@ -36,7 +36,7 @@ INSTANCE_TYPE_FILE = '%s/conf/%s' % (os.path.dirname(os.path.abspath(__file__)),
 
 class VMConnector(BaseConnector):
 
-    def __init__(self, transaction=None, conf=None):
+    def __init__(self, transaction=None, config=None):
         self.client = None
         self.project_id = None
         self.region = None
@@ -140,6 +140,24 @@ class VMConnector(BaseConnector):
         response = self.client.instanceGroupManagers().list(project=self.project_id, zone=self.zone).execute()
         firewall = response.get('items', [])
         return firewall
+
+    def list_load_balancers(self, **query):
+        response = self.client.urlMaps().list(project=self.project_id).execute()
+        url_maps = response.get('items', [])
+        return url_maps
+
+    def list_vpcs(self, **query):
+        response = self.client.networks().list(project=self.project_id).execute()
+        vpcs = response.get('items', [])
+        return vpcs
+
+    def list_subnets(self, **query):
+        response = self.client.subnetworks().list(project=self.project_id).execute()
+        subnetworks = response.get('items', [])
+        return subnetworks
+
+    # bluese-cloudone-20200113
+    #===== [asia-northeast3-a]
 
     def _get_filter_to_params(self, **query):
         filtering_list = []

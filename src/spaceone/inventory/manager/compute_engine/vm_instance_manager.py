@@ -23,7 +23,7 @@ class VMInstanceManager(BaseManager):
                     "os_distro": "",
                     "os_arch": "",
                 },
-                "aws": {
+                "google_cloud": {
                     "ebs_optimized": "",
                     "iam_instance_profile": {
                         "id": "",
@@ -86,6 +86,18 @@ class VMInstanceManager(BaseManager):
         return server_data
 
     def get_os_data(self, instance, image, os_type):
+        os_dists = instance.get("licenses", [])
+        for os_dist in os_dists:
+            os_items = os_dist.split("/")
+
+            ret_dic['data']['os']["os_version"] = os_items[-1]
+            ret_dic['data']['os']["os_arch"] = ""
+
+            if "windows" in ret_dic['data']['os']["os_version"]:
+                ret_dic["os_type"] = "WINDOWS"
+            else:
+                ret_dic["os_type"] = "LINUX"
+
         os_data = {
             'details': image.get('Description', ''),
             'os_distro': self.get_os_distro(image.get('Name', ''), os_type),
