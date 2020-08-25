@@ -21,8 +21,6 @@ class GoogleCloudComputeConnector(BaseConnector):
     def __init__(self, transaction=None, config=None):
         self.client = None
         self.project_id = None
-        self.region = None
-        self.zone = None
 
     def verify(self, options, secret_data):
         self.get_connect(secret_data)
@@ -39,7 +37,7 @@ class GoogleCloudComputeConnector(BaseConnector):
         try:
             self.project_id = secret_data.get('project_id')
             credentials = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
-            return googleapiclient.discovery.build('compute', 'v1', credentials=credentials)
+            self.client = googleapiclient.discovery.build('compute', 'v1', credentials=credentials)
         except Exception as e:
             print(e)
             raise self.client(message='connection failed. Please check your authentication information.')
@@ -73,37 +71,43 @@ class GoogleCloudComputeConnector(BaseConnector):
 
     def list_url_maps(self, **query):
         query = self.generate_query(**query)
-        response = self.client.urlMaps().list(project=self.project_id).execute()
+        response = self.client.urlMaps().list(**query).execute()
         url_map = response.get('items', [])
         return url_map
 
     def list_disk(self, **query):
-        response = self.client.disks().list(project=self.project_id, zone=self.zone).execute()
+        query = self.generate_query(**query)
+        response = self.client.disks().list(**query).execute()
         disks = response.get('items', [])
         return disks
 
     def list_disk_types(self, **query):
-        response = self.client.diskTypes().list(project=self.project_id, zone=self.zone).execute()
+        query = self.generate_query(**query)
+        response = self.client.diskTypes().list(**query).execute()
         disks_types = response.get('items', [])
         return disks_types
 
     def list_auto_scalers(self, **query):
-        response = self.client.autoscalers().list(project=self.project_id, zone=self.zone).execute()
+        query = self.generate_query(**query)
+        response = self.client.autoscalers().list(**query).execute()
         auto_scaler = response.get('items', [])
         return auto_scaler
 
     def list_firewalls(self, **query):
-        response = self.client.firewalls().list(project=self.project_id).execute()
+        query = self.generate_query(**query)
+        response = self.client.firewalls().list(**query).execute()
         firewall = response.get('items', [])
         return firewall
 
     def list_images(self, **query):
-        response = self.client.images().list(project=self.project_id).execute()
+        query = self.generate_query(**query)
+        response = self.client.images().list(**query).execute()
         firewall = response.get('items', [])
         return firewall
 
     def list_instance_groups(self, **query):
-        response = self.client.instanceGroups().list(project=self.project_id).execute()
+        query = self.generate_query(**query)
+        response = self.client.instanceGroups().list(**query).execute()
         firewall = response.get('items', [])
         return firewall
 
@@ -114,7 +118,8 @@ class GoogleCloudComputeConnector(BaseConnector):
         return firewall
 
     def list_instance_group_managers(self, **query):
-        response = self.client.instanceGroupManagers().list(project=self.project_id, zone=self.zone).execute()
+        query = self.generate_query(**query)
+        response = self.client.instanceGroupManagers().list(**query).execute()
         firewall = response.get('items', [])
         return firewall
 
@@ -167,8 +172,7 @@ class GoogleCloudComputeConnector(BaseConnector):
 
             query.update({
                 key: value,
-                'project': self.project_id,
-                'zone': self.zone
+                'project': self.project_id
             })
 
         return query

@@ -115,10 +115,8 @@ class CollectorService(BaseService):
         """
 
         start_time = time.time()
-        # parameter setting for multi threading
         all_regions = self.collector_manager.list_regions(params['secret_data'])
 
-        mt_params = self.set_params_for_zones(params)
         resource_regions = []
         collected_region_code = []
 
@@ -128,9 +126,11 @@ class CollectorService(BaseService):
         region_resource_format = {'resource_type': 'inventory.Region',
                                   'match_rules': {'1': ['region_code', 'region_type']}}
 
+        zone_independent_resources = self.collector_manager.get_zone_independent_resources(params['secret_data'],
+                                                                                           all_regions)
 
-        url_maps, instance_type, vpc, firewall, image, instance_groups = \
-            self.collector_manager.get_zone_independent_resources(params['secret_data'], all_regions)
+        # parameter setting for multi threading
+        mt_params = self.set_params_for_zones(params, all_regions, zone_independent_resources)
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
             future_executors = []
@@ -152,23 +152,29 @@ class CollectorService(BaseService):
 
         print(f'############## TOTAL FINISHED {time.time() - start_time} Sec ##################')
 
-    def set_params_for_zones(self, params):
+    def set_params_for_zones(self, params, all_regions, resources):
+        print("[ SET Params for ZONES ]")
         params_for_zones = []
 
         (query, instance_ids, filter_region_name) = self._check_query(params['filter'])
-        target_zones = self.get_all_zones(params.get('secret_data', ''), filter_region_name)
+        target_zones = self.get_all_zones(params.get('secret_data', ''), filter_region_name, all_regions)
 
         for target_zone in target_zones:
+            _conn = self.locator.get_connector('GoogleCloudComputeConnector')
+            _conn.get_connect(params['secret_data'])
+
             params_for_zones.append({
-                'zone': target_zone,
+                'connector': _conn,
+                'zone_info': target_zone,
                 'query': query,
                 'secret_data': params['secret_data'],
-                'instance_ids': instance_ids
+                'instance_ids': instance_ids,
+                'resources': resources
             })
 
         return params_for_zones
 
-    def get_all_zones(self, secret_data, filter_region_name):
+    def get_all_zones(self, secret_data, filter_region_name, all_regions):
         """ Find all zone name
         Args:
             secret_data: secret data
@@ -177,28 +183,32 @@ class CollectorService(BaseService):
         Returns: list of zones
         """
         match_zones = []
-        zones = self.collector_manager.list_zones(secret_data)
 
         if 'region_name' in secret_data:
-            match_zones = self.match_zones_from_region(zones, secret_data['regioni_name'],
-                                                       self.get_full_resource_name(secret_data['project_id'],
-                                                                                   'regions',
-                                                                                   secret_data['region_name']))
+            match_zones = self.match_zones_from_region(all_regions, secret_data['region_name'])
 
         if len(filter_region_name) > 0:
             for _region in filter_region_name:
-                match_zones = self.match_zones_from_region(zones, _region,
-                                                           self.get_full_resource_name(secret_data['project_id'],
-                                                                                       'regions', _region))
+                match_zones = self.match_zones_from_region(all_regions, _region)
 
         if not match_zones:
-            match_zones = list(map(lambda zone: {'zone': zone['name'], 'region': zone['region'].split('/')[-1]}, zones))
+            print(f'region count = {len(all_regions)}')
+            for region in all_regions:
+                for zone in region.get('zones', []):
+                    match_zones.append({'zone': zone.split('/')[-1], 'region': region['name']})
 
         return match_zones
 
     @staticmethod
-    def match_zones_from_region(zones, region, full_region_resource):
-        return [{'zone': zone['name'], 'region': region} for zone in zones if zone['region'] == full_region_resource]
+    def match_zones_from_region(all_regions, region):
+        match_zones = []
+
+        for _region in all_regions:
+            if _region['name'] == region:
+                for _zone in _region.get('zones', []):
+                    match_zones.append({'region': region, 'zone': _zone.split('/')[-1]})
+
+        return match_zones
 
     @staticmethod
     def get_full_resource_name(project_id, resource_type, resource):

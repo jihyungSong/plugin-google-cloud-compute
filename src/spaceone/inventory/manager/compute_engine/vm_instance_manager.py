@@ -9,7 +9,7 @@ class VMInstanceManager(BaseManager):
     def __init__(self, params):
         self.params = params
 
-    def get_server_info(self, instance, instance_types, disks, current_vo):
+    def get_server_info(self, instance, instance_types, disks):
         '''
         server_data = {
             "name": '',
