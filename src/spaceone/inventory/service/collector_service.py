@@ -1,12 +1,11 @@
 import time
 import logging
 import concurrent.futures
-from pprint import pprint
 from spaceone.core.service import *
 from spaceone.inventory.manager.collector_manager import CollectorManager
 
 _LOGGER = logging.getLogger(__name__)
-DEFAULT_REGION = 'asia-east1'
+
 FILTER_FORMAT = [
     {
         'key': 'project_id',
@@ -117,7 +116,9 @@ class CollectorService(BaseService):
 
         start_time = time.time()
         # parameter setting for multi threading
-        mp_params = self.set_params_for_regions(params)
+        all_regions = self.collector_manager.list_regions(params['secret_data'])
+
+        mt_params = self.set_params_for_zones(params)
         resource_regions = []
         collected_region_code = []
 
@@ -127,10 +128,14 @@ class CollectorService(BaseService):
         region_resource_format = {'resource_type': 'inventory.Region',
                                   'match_rules': {'1': ['region_code', 'region_type']}}
 
+
+        url_maps, instance_type, vpc, firewall, image, instance_groups = \
+            self.collector_manager.get_zone_independent_resources(params['secret_data'], all_regions)
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
             future_executors = []
-            for mp_param in mp_params:
-                future_executors.append(executor.submit(self.collector_manager.list_resources, mp_param))
+            for mt_param in mt_params:
+                future_executors.append(executor.submit(self.collector_manager.list_resources, mt_param))
 
             for future in concurrent.futures.as_completed(future_executors):
                 for result in future.result():
@@ -147,15 +152,15 @@ class CollectorService(BaseService):
 
         print(f'############## TOTAL FINISHED {time.time() - start_time} Sec ##################')
 
-    def set_params_for_regions(self, params):
+    def set_params_for_zones(self, params):
         params_for_zones = []
 
-        (query, instance_ids, filter_zone_name) = self._check_query(params['filter'])
-        target_regions = self.get_all_zones(params.get('secret_data', ''), filter_zone_name)
+        (query, instance_ids, filter_region_name) = self._check_query(params['filter'])
+        target_zones = self.get_all_zones(params.get('secret_data', ''), filter_region_name)
 
-        for target_region in target_regions:
+        for target_zone in target_zones:
             params_for_zones.append({
-                'region_name': target_region,
+                'zone': target_zone,
                 'query': query,
                 'secret_data': params['secret_data'],
                 'instance_ids': instance_ids
@@ -163,7 +168,44 @@ class CollectorService(BaseService):
 
         return params_for_zones
 
-    def _check_query(self, query):
+    def get_all_zones(self, secret_data, filter_region_name):
+        """ Find all zone name
+        Args:
+            secret_data: secret data
+            filter_region_name (list): list of region_name if wanted
+
+        Returns: list of zones
+        """
+        match_zones = []
+        zones = self.collector_manager.list_zones(secret_data)
+
+        if 'region_name' in secret_data:
+            match_zones = self.match_zones_from_region(zones, secret_data['regioni_name'],
+                                                       self.get_full_resource_name(secret_data['project_id'],
+                                                                                   'regions',
+                                                                                   secret_data['region_name']))
+
+        if len(filter_region_name) > 0:
+            for _region in filter_region_name:
+                match_zones = self.match_zones_from_region(zones, _region,
+                                                           self.get_full_resource_name(secret_data['project_id'],
+                                                                                       'regions', _region))
+
+        if not match_zones:
+            match_zones = list(map(lambda zone: {'zone': zone['name'], 'region': zone['region'].split('/')[-1]}, zones))
+
+        return match_zones
+
+    @staticmethod
+    def match_zones_from_region(zones, region, full_region_resource):
+        return [{'zone': zone['name'], 'region': region} for zone in zones if zone['region'] == full_region_resource]
+
+    @staticmethod
+    def get_full_resource_name(project_id, resource_type, resource):
+        return f'https://www.googleapis.com/compute/v1/projects/{project_id}/{resource_type}/{resource}'
+
+    @staticmethod
+    def _check_query(query):
         """
         Args:
             query (dict): example
@@ -186,29 +228,10 @@ class CollectorService(BaseService):
                 region_name.extend(value)
 
             else:
-                if isinstance(value, list) == False:
+                if not isinstance(value, list):
                     value = [value]
 
                 if len(value) > 0:
                     filters.append({'Name': key, 'Values': value})
 
-        return (filters, instance_ids, region_name)
-
-    def get_all_zones(self, secret_data, filter_zone_name):
-        """ Find all zone name
-        Args:
-            secret_data: secret data
-            region_name (list): list of region_name if wanted
-
-        Returns: list of region name
-        """
-
-        if 'region_name' in secret_data:
-            return [secret_data['region_name']]
-
-        if len(filter_zone_name) > 0:
-            return filter_zone_name
-
-        zones = self.collector_manager.list_regions(secret_data, DEFAULT_REGION)
-        regions_name_list = [zone.get('name', None) for zone in zones if zone.get('name') is not None]
-        return regions_name_list
+        return filters, instance_ids, region_name

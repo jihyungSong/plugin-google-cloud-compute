@@ -34,7 +34,7 @@ class AutoScalerManager(BaseManager):
         for instance_group in instance_groups:
             find = False
             instance_group_name = instance_group.get('baseInstanceName', '')
-            inst_list = self.vm_connector.list_instance_from_instance_groups(instance_group_name)
+            inst_list = self.vm_connector.list_instance_from_instance_groups(instance_group=instance_group_name)
             for single_in_inst_list in inst_list:
                 instance_name = self._get_key_name('instance', single_in_inst_list)
                 if instance.get('name') == instance_name:

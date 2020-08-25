@@ -37,22 +37,20 @@ class GoogleCloudComputeConnector(BaseConnector):
             - ...
         """
         try:
+            self.project_id = secret_data.get('project_id')
             credentials = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
             return googleapiclient.discovery.build('compute', 'v1', credentials=credentials)
         except Exception as e:
             print(e)
             raise self.client(message='connection failed. Please check your authentication information.')
 
-    def set_client(self, secret_data, zone_name):
-        self.client = self.get_connect(secret_data)
-        self.project_id = secret_data.get('project_id')
-        self.region = self.get_region(zone_name)
-        self.zone = zone_name
+    def list_regions(self):
+        result = self.client.regions().list(project=self.project_id).execute()
+        return result.get('items', [])
 
-    def list_zones(self, secret_data):
-        result = self.client.zones().list(project=secret_data.get('project_id')).execute()
-        zones = result.get('items', [])
-        return zones
+    def list_zones(self):
+        result = self.client.zones().list(project=self.project_id).execute()
+        return result.get('items', [])
 
     def list_instances(self, **query):
         status_filter = {'key': 'status', 'values': ['STAGING', 'RUNNING', 'STOPPING', 'REPAIRING']}
@@ -68,12 +66,13 @@ class GoogleCloudComputeConnector(BaseConnector):
         return compute_instances
 
     def list_machine_types(self, **query):
-        query = self.generate_query(is_default=True, **query)
+        query = self.generate_query(**query)
         result = self.client.machineTypes().list(**query).execute()
         instance_types = result.get('items', [])
         return instance_types
 
     def list_url_maps(self, **query):
+        query = self.generate_query(**query)
         response = self.client.urlMaps().list(project=self.project_id).execute()
         url_map = response.get('items', [])
         return url_map
@@ -108,9 +107,9 @@ class GoogleCloudComputeConnector(BaseConnector):
         firewall = response.get('items', [])
         return firewall
 
-    def list_instance_from_instance_groups(self, instance_group, **query):
-        response = self.client.instanceGroups().listInstances(project=self.project_id, zone=self.zone,
-                                                              instanceGroup=instance_group).execute()
+    def list_instance_from_instance_groups(self, **query):
+        query = self.generate_query(**query)
+        response = self.client.instanceGroups().listInstances(**query).execute()
         firewall = response.get('items', [])
         return firewall
 
@@ -120,11 +119,18 @@ class GoogleCloudComputeConnector(BaseConnector):
         return firewall
 
     def list_vpcs(self, **query):
-        response = self.client.networks().list(project=self.project_id).execute()
+        query = self.generate_query(**query)
+        response = self.client.networks().list(**query).execute()
         return response.get('items', [])
 
     def list_subnets(self, **query):
-        response = self.client.subnetworks().list(project=self.project_id, region=self.region).execute()
+        query = self.generate_query(**query)
+        response = self.client.subnetworks().list(**query).execute()
+        return response.get('items', [])
+
+    def list_forwarding_rules(self, **query):
+        query = self.generate_query(**query)
+        response = self.client.forwardingRules().list(**query).execute()
         return response.get('items', [])
 
     # bluese-cloudone-20200113
@@ -143,12 +149,10 @@ class GoogleCloudComputeConnector(BaseConnector):
 
             return ' AND '.join(filtering_list)
 
-    def generate_query(self, is_default=False, **query):
-        if is_default:
-            query.update({
-                'project': self.project_id,
-                'zone': self.zone
-            })
+    def generate_query(self, **query):
+        query.update({
+            'project': self.project_id,
+        })
         return query
 
     def generate_key_query(self, key, value, delete, is_default=False, **query):

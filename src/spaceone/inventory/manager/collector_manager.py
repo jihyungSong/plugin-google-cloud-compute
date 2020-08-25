@@ -2,7 +2,7 @@ __all__ = ['CollectorManager']
 
 import time
 import logging
-from pprint import pprint
+import concurrent.futures
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
@@ -13,9 +13,12 @@ from spaceone.inventory.model.region import Region
 
 
 _LOGGER = logging.getLogger(__name__)
+NUMBER_OF_CONCURRENT = 20
 
 
 class CollectorManager(BaseManager):
+
+    gcp_connector = None
 
     def __init__(self, transaction):
         super().__init__(transaction)
@@ -23,63 +26,72 @@ class CollectorManager(BaseManager):
     def verify(self, options, secret_data):
         """ Check connection
         """
-        gcp_connector = self.locator.get_connector('GoogleCloudComputeConnector')
-        r = gcp_connector.verify(options, secret_data)
+        self.gcp_connector = self.locator.get_connector('GoogleCloudComputeConnector')
+        r = self.gcp_connector.verify(options, secret_data)
         # ACTIVE/UNKNOWN
         return r
 
-    def list_regions(self, secret_data, region_name):
-        gcp_connector: GoogleCloudComputeConnector = self.locator.get_connector('GoogleCloudComputeConnector')
-        gcp_connector.set_client(secret_data, region_name)
-        return gcp_connector.list_zones(secret_data)
+    def set_connector(self, secret_data):
+        self.gcp_connector: GoogleCloudComputeConnector = self.locator.get_connector('GoogleCloudComputeConnector')
+        self.gcp_connector.get_connect(secret_data)
+
+    def list_regions(self, secret_data):
+        if self.gcp_connector is None:
+            self.set_connector(secret_data)
+
+        return self.gcp_connector.list_regions(secret_data)
+
+    def list_zones(self, secret_data):
+        if self.gcp_connector is None:
+            self.set_connector(secret_data)
+
+        return self.gcp_connector.list_zones()
 
     def list_instances(self, params):
         server_vos = []
-        gcp_connector: GoogleCloudComputeConnector = self.locator.get_connector('GoogleCloudComputeConnector')
-        gcp_connector.set_client(params['secret_data'], params['region_name'])
 
         # TODO:
-        current_vo = self._get_simplified_vo(gcp_connector)
+        current_vo = self._get_simplified_vo(self.gcp_connector)
 
         instance_filter = {}
 
         if len(params.get('instance_ids', [])) > 0:
             instance_filter.update({'filter': [{'key': 'id', 'values': params['instance_ids']}]})
 
-        instances = gcp_connector.list_instances(**instance_filter)
+        instances = self.gcp_connector.list_instances(**instance_filter)
 
         print(f'===== [{params["region_name"]}]  /  INSTANCE COUNT : {len(instances)}')
 
         if len(instances) > 0:
             # Get Instance Type for GCP
 
-            instance_group = gcp_connector.list_instance_group_managers()
-            instance_types = gcp_connector.list_machine_types()
+            instance_group = self.gcp_connector.list_instance_group_managers()
+            instance_types = self.gcp_connector.list_machine_types()
 
             # Image
-            images = gcp_connector.list_images()
+            images = self.gcp_connector.list_images()
 
             # Autoscaling group list
-            auto_scaler = gcp_connector.list_auto_scalers()
+            auto_scaler = self.gcp_connector.list_auto_scalers()
 
             # LB list
-            load_balancers = gcp_connector.list_url_maps()
+            load_balancers = self.gcp_connector.list_url_maps()
 
             # VPC
-            vpcs = gcp_connector.list_vpcs()
-            subnets = gcp_connector.list_subnets()
+            vpcs = self.gcp_connector.list_vpcs()
+            subnets = self.gcp_connector.list_subnets()
 
             # disks
-            disks = gcp_connector.list_disk()
-            disk_types = gcp_connector.list_disk_types()
+            disks = self.gcp_connector.list_disk()
+            disk_types = self.gcp_connector.list_disk_types()
 
             # Security Group(firewall)
-            security_groups = gcp_connector.list_firewalls()
+            security_groups = self.gcp_connector.list_firewalls()
 
             # call_up all the managers
             vm_instance_manager: VMInstanceManager = VMInstanceManager(params)
-            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params, vm_connector=gcp_connector)
-            elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=gcp_connector)
+            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params, vm_connector=self.gcp_connector)
+            elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=self.gcp_connector)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
             vpc_manager: VPCManager = VPCManager(params)
@@ -133,10 +145,22 @@ class CollectorManager(BaseManager):
     def list_resources(self, params):
         '''
         params = {
-            'region_name': target_region,
+            'zone': {
+               'region': 'us-east-1,
+               'zone': 'us-east-1a'
+            },
             'query': query,
             'secret_data': 'secret_data',
-            'instance_ids': [instance_id, instance_id, ...]
+            'instance_ids': [instance_id, instance_id, ...],
+            'resources': {
+               'url_maps': [...],
+               'forwarding_rules': [...],
+               'vpcs': [...],
+               'subnets: [...],
+               'firewalls': [...],
+               'images': [...],
+               'instance_groups': [...]
+            }
         }
         '''
         start_time = time.time()
@@ -149,6 +173,24 @@ class CollectorManager(BaseManager):
         except Exception as e:
             print(f'[ERROR: {params["region_name"]}] : {e}')
             return []
+
+    def list_subnets(self, params):
+        '''
+        params = {
+            'project': 'GOOGLE_PROJECT',
+            'region': 'GOOGLE_REGION'
+        }
+        '''
+        return self.gcp_connector.list_subnets(region=params['region'])
+
+    def list_forwarding_rules(self, params):
+        '''
+        params = {
+            'project': 'GOOGLE_PROJECT',
+            'region': 'GOOGLE_REGION'
+        }
+        '''
+        return self.gcp_connector.list_forwarding_rules(region=params['region'])
 
     def get_volume_ids(self, instance):
         block_device_mappings = instance.get('BlockDeviceMappings', [])
@@ -171,6 +213,45 @@ class CollectorManager(BaseManager):
             merge_ip_address.append(server_data['data']['public_ip_address'])
 
         return list(set(merge_ip_address))
+
+    def get_zone_independent_resources(self, secret_data, regions):
+        if self.gcp_connector is None:
+            self.set_connector(secret_data)
+
+        url_maps = self.gcp_connector.list_url_maps()
+        images = self.gcp_connector.list_images()
+        machine_types = self.gcp_connector.list_machine_types()
+        vpcs = self.gcp_connector.list_vpcs()
+        fire_walls = self.gcp_connector.list_firewalls()
+        instance_groups = self.gcp_connector.list_instance_groups()
+        subnets = []
+        forwarding_rules = []
+
+        mt_params = self.generate_mt_params(secret_data, regions)
+
+        # Generate Thread Pool for collecting Subnets
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+            future_executors = []
+            for mt_param in mt_params:
+                future_executors.append(executor.submit(self.list_subnets, mt_param))
+
+            for future in concurrent.futures.as_completed(future_executors):
+                for result in future.result():
+                    subnets.append(result)
+
+        # Generate Thread Pool for collecting Forwarding Rules
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+            future_executors = []
+            for mt_param in mt_params:
+                future_executors.append(executor.submit(self.list_forwarding_rules, mt_param))
+
+            for future in concurrent.futures.as_completed(future_executors):
+                for result in future.result():
+                    subnets.append(result)
+
+    @staticmethod
+    def generate_mt_params(secret_data, regions):
+        return list(map(lambda region: {'project': secret_data['project_id'], 'region': region['name']}, regions))
 
     @staticmethod
     def _get_simplified_vo(vm_connector):
