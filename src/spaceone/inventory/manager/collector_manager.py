@@ -75,7 +75,7 @@ class CollectorManager(BaseManager):
             security_groups = vm_connector.list_firewall()
 
             # call_up all the managers
-            vm_instance_manager: VMInstanceManager = VMInstanceManager(params, vm_connector=vm_connector)
+            vm_instance_manager: VMInstanceManager = VMInstanceManager(params)
             auto_scaler_manager: AutoScalerManager = AutoScalerManager(params, vm_connector=vm_connector)
             elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=vm_connector)
             disk_manager: DiskManager = DiskManager(params)
@@ -91,7 +91,7 @@ class CollectorManager(BaseManager):
                 load_balancer_vos = elb_manager.get_load_balancer_info(load_balancers, target_groups,
                                                                        instance_id, instance_ip)
 
-                disk_vos = disk_manager.get_disk_info(self.get_volume_ids(instance), volumes)
+                disk_vos = disk_manager.get_disk_info(instance, disks)
                 vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
 
                 nic_vos = nic_manager.get_nic_info(instance.get('NetworkInterfaces'), subnet_vo)

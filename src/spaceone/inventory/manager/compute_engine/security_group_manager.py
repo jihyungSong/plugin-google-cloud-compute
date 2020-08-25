@@ -4,9 +4,9 @@ from spaceone.inventory.model.security_group import SecurityGroup
 
 class SecurityGroupRuleManager(BaseManager):
 
-    def __init__(self, params, ec2_connector=None):
+    def __init__(self, params, vm_connector=None):
         self.params = params
-        self.ec2_connector = ec2_connector
+        self.ec2_connector = vm_connector
 
     def get_security_group_rules_info(self, security_group_ids, security_groups):
         '''

@@ -4,10 +4,8 @@ from spaceone.inventory.model.subnet import Subnet
 
 
 class VPCManager(BaseManager):
-
-    def __init__(self, params, ec2_connector=None):
+    def __init__(self, params):
         self.params = params
-        self.ec2_connector = ec2_connector
 
     def get_vpc_info(self, instance, vpcs, subnets):
         '''
@@ -30,34 +28,42 @@ class VPCManager(BaseManager):
 
         vpc_data = {}
         subnet_data = {}
-        matched_subnet = self.get_subnet(instance, subnets)
-        matched_vpc = self.get_vpc(matched_subnet, vpcs)
+        matched_subnet = self._get_matching_subnet(instance, subnets)
+        matched_vpc = self.get_matching_vpc(matched_subnet, vpcs)
 
-        # if match_vpc is not None:
-        #     vpc_data.update({
-        #         'vpc_arn': self.generate_arn('vpc', match_vpc.get('OwnerId'), match_vpc.get('VpcId'), region_name),
-        #         'vpc_id': match_vpc.get('VpcId'),
-        #         'cidr': match_vpc.get('CidrBlock'),
-        #         'vpc_name': self.generate_name(match_vpc),
-        #     })
-        #
-        # if match_subnet is not None:
-        #     subnet_data.update({
-        #         'subnet_name': self.generate_name(match_subnet),
-        #         'subnet_arn': match_subnet.get('SubnetArn'),
-        #         'subnet_id': match_subnet.get('SubnetId'),
-        #         'cidr':  match_subnet.get('CidrBlock'),
-        #     })
+        if matched_vpc is not None:
+            vpc_data.update({
+                'vpc_id': matched_vpc.get('id', ''),
+                'vpc_name': matched_vpc.get('name', ''),
+                'description': matched_vpc.get('description', ''),
+                'self_link': matched_vpc.get('selfLink', ''),
+            })
+
+        if matched_subnet is not None:
+            subnet_data.update({
+                'subnet_id': matched_subnet.get('id', ''),
+                'cidr': matched_subnet.get('ipCidrRange', ''),
+                'subnet_name': matched_subnet.get('name', ''),
+                'gateway_address': matched_subnet.get('gatewayAddress', ''),
+                'vpc': matched_vpc,
+                'self_link': matched_subnet.get('selfLink', '')
+            })
 
         return VPC(vpc_data, strict=False), Subnet(subnet_data, strict=False)
 
-    def get_vpc(self, matched_subnet, vpcs):
+    def get_matching_vpc(self, matched_subnet, vpcs):
+        matching_vpc = None
+        network = self._get_network_str(matched_subnet)
+        if network is not None:
+            for vpc in vpcs:
+                if any(network in s for s in vpc.get('subnetworks', [])):
+                    matching_vpc = vpc
+                    break
 
-        for vpc in vpcs:
-            pass
-        return None
+        return matching_vpc
 
-    def get_subnet(self, instance, subnets):
+    @staticmethod
+    def _get_matching_subnet(instance, subnets):
         subnet_data = None
         subnet_work_links =[]
         network_interfaces = instance.get('networkInterfaces', [])
@@ -73,13 +79,11 @@ class VPCManager(BaseManager):
 
         return subnet_data
 
-    def generate_arn(self, resource_type, owner_id, resource_id, region_name):
-        return f'arn:aws:ec2:{region_name}:{owner_id}:{resource_type}/{resource_id}'
-
     @staticmethod
-    def generate_name(resource):
-        for resource_tag in resource.get('Tags', []):
-            if resource_tag['Key'] == "Name":
-                return resource_tag["Value"]
+    def _get_network_str(subnet):
+        network = subnet.get('network', '')
+        return network[network.find('/projects/'):len(network)] if network != '' else None
 
-        return ''
+
+
+

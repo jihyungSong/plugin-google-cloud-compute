@@ -4,9 +4,9 @@ from spaceone.inventory.model.nic import NIC
 
 class NICManager(BaseManager):
 
-    def __init__(self, params, ec2_connector=None):
+    def __init__(self, params, vm_connector=None):
         self.params = params
-        self.ec2_connector = ec2_connector
+        self.vm_connector = vm_connector
 
     def get_nic_info(self, network_interfaces, subnet_vo):
         '''

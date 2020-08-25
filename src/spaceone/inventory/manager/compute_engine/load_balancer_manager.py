@@ -10,13 +10,19 @@ class LoadBalancerManager(BaseManager):
         self.vm_connector: VMConnector = vm_connector
 
     def get_load_balancer_info(self, load_balancers, target_groups, instance_id=None, instance_ip=None):
+        # type = StringType(choices=('HTTP', 'TCP', 'UDP'))
+        # name = StringType()
+        # dns = StringType(default="")
+        # port = ListType(IntType())
+        # protocol = ListType(StringType())
+        # scheme = StringType(choices=('EXTERNAL', 'INTERNAL'))
+        # tags = DictType(StringType, default={})
         '''
         load_balancer_data_list = [{
-                "dns": "",
-                "type": "network" | "application"
-                "arn": "",
-                "scheme": 'internet-facing'|'internal,
+                "type": 'HTTP'| 'TCP'| 'UDP'
                 "name": "",
+                "dns": "",
+                "scheme": 'EXTERNAL'|'INTERNAL,
                 "port": [
                     50051
                 ],
