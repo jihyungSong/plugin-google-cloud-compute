@@ -133,8 +133,13 @@ class GoogleCloudComputeConnector(BaseConnector):
         response = self.client.forwardingRules().list(**query).execute()
         return response.get('items', [])
 
-    # bluese-cloudone-20200113
-    #===== [asia-northeast3-a]
+    def set_instance_into_instance_group_managers(self, instance_group_managers):
+        for instance_group in instance_group_managers:
+            instance_group_name = instance_group.get('baseInstanceName', '')
+            inst_list = self.list_instance_from_instance_groups(instance_group_name)
+            instance_group.update({
+                'instance_list': inst_list
+            })
 
     def _get_filter_to_params(self, **query):
         filtering_list = []

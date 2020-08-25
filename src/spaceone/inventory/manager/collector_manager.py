@@ -90,8 +90,8 @@ class CollectorManager(BaseManager):
 
             # call_up all the managers
             vm_instance_manager: VMInstanceManager = VMInstanceManager(params)
-            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params, vm_connector=self.gcp_connector)
-            elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=self.gcp_connector)
+            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params)
+            lb_manager: LoadBalancerManager = LoadBalancerManager(params)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
             vpc_manager: VPCManager = VPCManager(params)
@@ -102,17 +102,16 @@ class CollectorManager(BaseManager):
                 server_data = vm_instance_manager.get_server_info(instance, instance_types, disks, current_vo)
                 auto_scaler_vo = auto_scaler_manager.get_auto_scaler_info(instance, instance_group, auto_scaler)
 
-                load_balancer_vos = elb_manager.get_load_balancer_info(load_balancers, target_groups,
-                                                                       instance_id, instance_ip)
+                # load_balancer_vos = elb_manager.get_load_balancing_info(load_balancers, target_groups,
+                #                                                        instance_id, instance_ip)
 
                 disk_vos = disk_manager.get_disk_info(instance, disks)
                 vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
+                nic_vos = nic_manager.get_nic_info(instance, subnet_vo)
 
-                nic_vos = nic_manager.get_nic_info(instance.get('NetworkInterfaces'), subnet_vo)
-
-                sg_ids = [security_group.get('GroupId') for security_group in instance.get('SecurityGroups', []) if
-                          security_group.get('GroupId') is not None]
-                sg_rules_vos = sg_manager.get_security_group_rules_info(sg_ids, sgs)
+                # sg_ids = [security_group.get('GroupId') for security_group in instance.get('SecurityGroups', []) if
+                #           security_group.get('GroupId') is not None]
+                # sg_rules_vos = sg_manager.get_security_group_rules_info(sg_ids, sgs)
 
                 server_data.update({
                     'nics': nic_vos,
@@ -122,7 +121,7 @@ class CollectorManager(BaseManager):
                 server_data['data'].update({
                     'load_balancers': load_balancer_vos,
                     'security_group_rules': sg_rules_vos,
-                    'auto_scaling_group': auto_scaler_vo,
+                    'auto_scaler_group': auto_scaler_vo,
                     'vpc': vpc_vo,
                     'subnet': subnet_vo,
                 })

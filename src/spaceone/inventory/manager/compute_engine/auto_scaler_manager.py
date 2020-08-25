@@ -1,13 +1,11 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.auto_scaler import AutoScaler
 
-
 class AutoScalerManager(BaseManager):
-    def __init__(self, params, vm_connector=None):
+    def __init__(self, params):
         self.params = params
-        self.vm_connector = vm_connector
 
-    def get_auto_scaler_info(self, instance, instance_groups, auto_scalers):
+    def get_auto_scaler_info(self, instance, instance_group_managers, auto_scalers):
         '''
         auto_scaler_data = {
             name: '',
@@ -21,27 +19,23 @@ class AutoScalerManager(BaseManager):
             }
         }
         '''
-        matched_inst_group = self.get_matched_instance_group(instance, instance_groups)
+        matched_inst_group = self.get_matched_instance_group(instance, instance_group_managers)
         auto_scaler_data = self._get_auto_scaler_data(matched_inst_group, auto_scalers)
         if auto_scaler_data is not None:
             return AutoScaler(auto_scaler_data, strict=False)
         else:
             return None
 
-    # TODO: match 작업을 밖에서 n 번만 하도록 구조 개선 필요
     def get_matched_instance_group(self, instance, instance_groups):
         matched_instance_group = None
         for instance_group in instance_groups:
-            find = False
-            instance_group_name = instance_group.get('baseInstanceName', '')
-            inst_list = self.vm_connector.list_instance_from_instance_groups(instance_group=instance_group_name)
-            for single_in_inst_list in inst_list:
-                instance_name = self._get_key_name('instance', single_in_inst_list)
+            instance_list = instance_group.get('instance_list', [])
+            for single_inst in instance_list:
+                instance_name = self._get_key_name('instance', single_inst)
                 if instance.get('name') == instance_name:
                     matched_instance_group = instance_group
                     find = True
                     break
-
             if find:
                 break
 
