@@ -96,7 +96,7 @@ class VMInstanceManager(BaseManager):
         return server_data
 
     def get_os_type_and_data(self, instance):
-        os_dists = instance.get("licenses", [])
+        os_dists = instance.get("licenses", [])         # TODO: TBD
         os_type = "LINUX"
         os_identity = ''
 
@@ -124,12 +124,10 @@ class VMInstanceManager(BaseManager):
             "reservation_affinity": self.get_reservation_affinity(instance),
             "deletion_protection": instance.get('deletionProtection', False),
             "scheduling": self.get_scheduling(instance),
-            "labels": self.get_labels(instance)
+            "labels": self.get_labels(instance)                             # TODO: API 형태 그대로 (dict)
         },
 
         return GoogleCloud(google_cloud, strict=False)
-
-
 
     def get_hardware_data(self, instance, instance_types):
         '''
@@ -138,6 +136,7 @@ class VMInstanceManager(BaseManager):
         is_vm = StringType(default=True)
         cpu_model = ListType(StringType(default=""))
         '''
+
         core, memory = self._get_core_and_memory(instance, instance_types)
         hardware_data = {
             'core': core,
@@ -173,7 +172,7 @@ class VMInstanceManager(BaseManager):
             'account': current_vo.get('project_id', ''),
             'image': self._get_image(instance, disks),
             'launched_at': instance.get('creationTimestamp'),
-            'tags':  {},
+            'tags':  {},                                 # TODO: Dict or String in Model 처리 필요
         }
 
         return Compute(compute_data)
@@ -201,7 +200,7 @@ class VMInstanceManager(BaseManager):
         memory = 0
         for i_type in instance_types:
             if i_type.get('selfLink', '') == machine_type:
-                cpu =  i_type.get('guestCpus')
+                cpu = i_type.get('guestCpus')
                 memory = round(float((i_type.get('memoryMb', 0)) / 1024), 2)
                 break
 

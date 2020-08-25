@@ -21,20 +21,20 @@ class AutoScalerManager(BaseManager):
             }
         }
         '''
-        matched_inst_group = self.get_auto_scaler_from_instance(self, instance, instance_groups)
+        matched_inst_group = self.get_matched_instance_group(instance, instance_groups)
         auto_scaler_data = self._get_auto_scaler_data(matched_inst_group, auto_scalers)
         if auto_scaler_data is not None:
             return AutoScaler(auto_scaler_data, strict=False)
         else:
             return None
 
-
+    # TODO: match 작업을 밖에서 n 번만 하도록 구조 개선 필요
     def get_matched_instance_group(self, instance, instance_groups):
         matched_instance_group = None
         for instance_group in instance_groups:
             find = False
             instance_group_name = instance_group.get('baseInstanceName', '')
-            inst_list = self.vm_connector.list_instance_from_instance_group(instance_group_name)
+            inst_list = self.vm_connector.list_instance_from_instance_groups(instance_group_name)
             for single_in_inst_list in inst_list:
                 instance_name = self._get_key_name('instance', single_in_inst_list)
                 if instance.get('name') == instance_name:

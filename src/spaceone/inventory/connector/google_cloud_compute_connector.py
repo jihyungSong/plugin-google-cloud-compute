@@ -1,4 +1,4 @@
-__all__ = ["VMConnector"]
+__all__ = ["GoogleCloudComputeConnector"]
 
 import logging
 import os
@@ -12,29 +12,11 @@ from spaceone.core.connector import BaseConnector
 from spaceone.core.utils import deep_merge
 from collections import defaultdict
 
-nested_dict = lambda: defaultdict(nested_dict)
-
-
-def ddict2dict(d):
-    for k, v in d.items():
-        if isinstance(v, dict):
-            d[k] = ddict2dict(v)
-    return dict(d)
-
-
 _LOGGER = logging.getLogger(__name__)
-
-DATA_INFO = {
-    'VM': {
-        'resource_type': 'SERVER',
-        'MATCH_RULES': {'1': ['data.compute.instance_id']},
-    }
-}
-
 INSTANCE_TYPE_FILE = '%s/conf/%s' % (os.path.dirname(os.path.abspath(__file__)), 'instances.json')
 
 
-class VMConnector(BaseConnector):
+class GoogleCloudComputeConnector(BaseConnector):
 
     def __init__(self, transaction=None, config=None):
         self.client = None
@@ -46,7 +28,7 @@ class VMConnector(BaseConnector):
         self.get_connect(secret_data)
         return "ACTIVE"
 
-    def get_connect(self, secret_data, service="compute_engine"):
+    def get_connect(self, secret_data):
         """
         cred(dict)
             - type: ..
@@ -69,11 +51,13 @@ class VMConnector(BaseConnector):
 
     def list_zones(self, secret_data):
         result = self.client.zones().list(project=secret_data.get('project_id')).execute()
-        regions = result.get('items', [])
-        return regions
+        zones = result.get('items', [])
+        return zones
 
     def list_instances(self, **query):
         status_filter = {'key': 'status', 'values': ['STAGING', 'RUNNING', 'STOPPING', 'REPAIRING']}
+
+        # filter 는 반드시 list 인가?
 
         if 'filter' in query:
             query.get('filter').append(status_filter)
@@ -83,7 +67,7 @@ class VMConnector(BaseConnector):
         query = self.generate_key_query('filter', self._get_filter_to_params(**query), '', is_default=True, **query)
         result = self.client.instances().list(**query).execute()
         compute_instances = result.get('items', [])
-        return compute_instances, self.project_id
+        return compute_instances
 
     def list_instance_types(self, **query):
         query = self.generate_query(is_default=True, **query)
@@ -96,16 +80,6 @@ class VMConnector(BaseConnector):
         url_map = response.get('items', [])
         return url_map
 
-    def list_vpc(self, **query):
-        response = self.client.networks().list(project=self.project_id).execute()
-        list_virtual_private_clouds = response.get('items', [])
-        return list_virtual_private_clouds
-
-    def list_subnet(self, **query):
-        response = self.client.networks().list(project=self.project_id, region=self.region).execute()
-        subnetworks = response.get('items', [])
-        return subnetworks
-
     def list_disk(self, **query):
         response = self.client.disks().list(project=self.project_id, zone=self.zone).execute()
         disks = response.get('items', [])
@@ -116,12 +90,12 @@ class VMConnector(BaseConnector):
         disks_types = response.get('items', [])
         return disks_types
 
-    def list_auto_scaler(self, **query):
+    def list_auto_scalers(self, **query):
         response = self.client.autoscalers().list(project=self.project_id, zone=self.zone).execute()
         auto_scaler = response.get('items', [])
         return auto_scaler
 
-    def list_firewall(self, **query):
+    def list_firewalls(self, **query):
         response = self.client.firewalls().list(project=self.project_id).execute()
         firewall = response.get('items', [])
         return firewall
@@ -131,37 +105,29 @@ class VMConnector(BaseConnector):
         firewall = response.get('items', [])
         return firewall
 
-    def list_instance_group(self, **query):
+    def list_instance_groups(self, **query):
         response = self.client.instanceGroups().list(project=self.project_id).execute()
         firewall = response.get('items', [])
         return firewall
 
-    def list_instance_from_instance_group(self, instance_group, **query):
+    def list_instance_from_instance_groups(self, instance_group, **query):
         response = self.client.instanceGroups().listInstances(project=self.project_id, zone=self.zone,
                                                               instanceGroup=instance_group).execute()
         firewall = response.get('items', [])
         return firewall
 
-
-    def list_instance_group_manager(self, **query):
+    def list_instance_group_managers(self, **query):
         response = self.client.instanceGroupManagers().list(project=self.project_id, zone=self.zone).execute()
         firewall = response.get('items', [])
         return firewall
 
-    def list_load_balancers(self, **query):
-        response = self.client.urlMaps().list(project=self.project_id).execute()
-        url_maps = response.get('items', [])
-        return url_maps
-
     def list_vpcs(self, **query):
         response = self.client.networks().list(project=self.project_id).execute()
-        vpcs = response.get('items', [])
-        return vpcs
+        return response.get('items', [])
 
     def list_subnets(self, **query):
-        response = self.client.subnetworks().list(project=self.project_id).execute()
-        subnetworks = response.get('items', [])
-        return subnetworks
+        response = self.client.subnetworks().list(project=self.project_id, region=self.region).execute()
+        return response.get('items', [])
 
     # bluese-cloudone-20200113
     #===== [asia-northeast3-a]
@@ -169,7 +135,7 @@ class VMConnector(BaseConnector):
     def _get_filter_to_params(self, **query):
         filtering_list = []
         filters = query.get('filter', None)
-        if isinstance(filters, list) and filters is not None:
+        if filters and isinstance(filters, list):
             for single_filter in filters:
                 filter_key = single_filter.get('key', '')
                 filter_values = single_filter.get('values', [])

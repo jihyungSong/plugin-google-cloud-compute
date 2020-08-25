@@ -103,7 +103,7 @@ class CollectorService(BaseService):
         return {}
 
     @transaction
-    @check_required(['options','secret_data', 'filter'])
+    @check_required(['options', 'secret_data', 'filter'])
     def list_resources(self, params):
         """ Get quick list of resources
         Args:
@@ -122,7 +122,7 @@ class CollectorService(BaseService):
         collected_region_code = []
 
         server_resource_format = {'resource_type': 'inventory.Server',
-                                  'match_rules': {'1': ['data.compute.instance_id']}}
+                                  'match_rules': {'1': ['reference.resource_id']}}
 
         region_resource_format = {'resource_type': 'inventory.Region',
                                   'match_rules': {'1': ['region_code', 'region_type']}}

@@ -1,13 +1,13 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.load_balancer import LoadBalancer
-from spaceone.inventory.connector.vm_connector import VMConnector
+from spaceone.inventory.connector.google_cloud_compute_connector import GoogleCloudComputeConnector
 
 
 class LoadBalancerManager(BaseManager):
 
     def __init__(self, params, vm_connector=None):
         self.params = params
-        self.vm_connector: VMConnector = vm_connector
+        self.vm_connector: GoogleCloudComputeConnector = vm_connector
 
     def get_load_balancer_info(self, load_balancers, target_groups, instance_id=None, instance_ip=None):
         # type = StringType(choices=('HTTP', 'TCP', 'UDP'))

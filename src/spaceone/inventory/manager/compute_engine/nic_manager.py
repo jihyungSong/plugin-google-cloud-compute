@@ -31,7 +31,7 @@ class NICManager(BaseManager):
                 'device': self.get_device(net_inf),
                 'nic_type': net_inf.get('InterfaceType', ''),
                 'cidr': subnet_vo.cidr,
-                'mac_address': net_inf.get('MacAddress'),
+                # 'mac_address': net_inf.get('MacAddress'),   # NO DATA
                 'public_ip_address': net_inf.get('Association', {}).get('PublicIp', ''),
                 'tags': {
                     'public_dns': net_inf.get('Association', {}).get('PublicDnsName', '')

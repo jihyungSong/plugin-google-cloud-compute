@@ -51,7 +51,7 @@ class DiskManager(BaseManager):
 
             single_disk = {
                 'device_index': int_disk.get('index'),
-                'device': 'disk',
+                'device': '',
                 'disk_type': 'disk',
                 'size': disk_sz,
                 'tags': single_disk_tag

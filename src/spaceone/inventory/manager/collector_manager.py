@@ -4,7 +4,7 @@ import time
 import logging
 from pprint import pprint
 from spaceone.core.manager import BaseManager
-from spaceone.inventory.connector import VMConnector
+from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
     DiskManager, NICManager, VPCManager, SecurityGroupRuleManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
@@ -23,61 +23,63 @@ class CollectorManager(BaseManager):
     def verify(self, options, secret_data):
         """ Check connection
         """
-        vm_connector = self.locator.get_connector('VMConnector')
-        r = vm_connector.verify(options, secret_data)
+        gcp_connector = self.locator.get_connector('GoogleCloudComputeConnector')
+        r = gcp_connector.verify(options, secret_data)
         # ACTIVE/UNKNOWN
         return r
 
     def list_regions(self, secret_data, region_name):
-        vm_connector: VMConnector = self.locator.get_connector('VMConnector')
-        vm_connector.set_client(secret_data, region_name)
-        return vm_connector.list_zones(secret_data)
+        gcp_connector: GoogleCloudComputeConnector = self.locator.get_connector('GoogleCloudComputeConnector')
+        gcp_connector.set_client(secret_data, region_name)
+        return gcp_connector.list_zones(secret_data)
 
     def list_instances(self, params):
         server_vos = []
-        vm_connector: VMConnector = self.locator.get_connector('VMConnector')
-        vm_connector.set_client(params['secret_data'], params['region_name'])
-        current_vo = self._get_simplified_vo(vm_connector)
+        gcp_connector: GoogleCloudComputeConnector = self.locator.get_connector('GoogleCloudComputeConnector')
+        gcp_connector.set_client(params['secret_data'], params['region_name'])
+
+        # TODO:
+        current_vo = self._get_simplified_vo(gcp_connector)
 
         instance_filter = {}
 
-        if 'instance_ids' in params and len(params.get('instance_ids', [])) > 0:
+        if len(params.get('instance_ids', [])) > 0:
             instance_filter.update({'filter': [{'key': 'id', 'values': params['instance_ids']}]})
 
-        instances, project_id = vm_connector.list_instances(**instance_filter)
+        instances = gcp_connector.list_instances(**instance_filter)
 
         print(f'===== [{params["region_name"]}]  /  INSTANCE COUNT : {len(instances)}')
 
         if len(instances) > 0:
             # Get Instance Type for GCP
 
-            instance_group = vm_connector.list_instance_group_manager()
-            instance_types = vm_connector.list_instance_types()
+            instance_group = gcp_connector.list_instance_group_managers()
+            instance_types = gcp_connector.list_instance_types()
 
             # Image
-            images = vm_connector.list_images()
+            images = gcp_connector.list_images()
 
             # Autoscaling group list
-            auto_scaler = vm_connector.list_auto_scaler()
+            auto_scaler = gcp_connector.list_auto_scalers()
 
             # LB list
-            load_balancers = vm_connector.list_load_balancers()
+            load_balancers = gcp_connector.list_url_maps()
 
             # VPC
-            vpcs = vm_connector.list_vpcs()
-            subnets = vm_connector.list_subnets()
+            vpcs = gcp_connector.list_vpcs()
+            subnets = gcp_connector.list_subnets()
 
             # disks
-            disks = vm_connector.list_disk()
-            disk_types = vm_connector.list_disk_types()
+            disks = gcp_connector.list_disk()
+            disk_types = gcp_connector.list_disk_types()
 
             # Security Group(firewall)
-            security_groups = vm_connector.list_firewall()
+            security_groups = gcp_connector.list_firewalls()
 
             # call_up all the managers
             vm_instance_manager: VMInstanceManager = VMInstanceManager(params)
-            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params, vm_connector=vm_connector)
-            elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=vm_connector)
+            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params, vm_connector=gcp_connector)
+            elb_manager: LoadBalancerManager = LoadBalancerManager(params, vm_connector=gcp_connector)
             disk_manager: DiskManager = DiskManager(params)
             nic_manager: NICManager = NICManager(params)
             vpc_manager: VPCManager = VPCManager(params)
@@ -129,6 +131,14 @@ class CollectorManager(BaseManager):
         return server_vos
 
     def list_resources(self, params):
+        '''
+        params = {
+            'region_name': target_region,
+            'query': query,
+            'secret_data': 'secret_data',
+            'instance_ids': [instance_id, instance_id, ...]
+        }
+        '''
         start_time = time.time()
 
         try:
