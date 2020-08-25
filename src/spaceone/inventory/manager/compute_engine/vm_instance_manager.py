@@ -124,7 +124,7 @@ class VMInstanceManager(BaseManager):
             "reservation_affinity": self.get_reservation_affinity(instance),
             "deletion_protection": instance.get('deletionProtection', False),
             "scheduling": self.get_scheduling(instance),
-            "labels": self.get_labels(instance)                             # TODO: API 형태 그대로 (dict)
+            "labels": instance.get('labels', {}) #self.get_labels(instance)
         },
 
         return GoogleCloud(google_cloud, strict=False)
@@ -172,10 +172,17 @@ class VMInstanceManager(BaseManager):
             'account': current_vo.get('project_id', ''),
             'image': self._get_image(instance, disks),
             'launched_at': instance.get('creationTimestamp'),
-            'tags':  {},                                 # TODO: Dict or String in Model 처리 필요
+            'tags': self._get_tags_only_string_values(instance) # TODO: Dict or String in Model 처리 필요
         }
-
         return Compute(compute_data)
+
+    @staticmethod
+    def _get_tags_only_string_values(instance):
+        tags = {}
+        for k, v in instance.get('tags', {}).items():
+            if isinstance(v, str):
+                tags.update({k:v})
+        return tags
 
     @staticmethod
     def _get_images(instance, disks):

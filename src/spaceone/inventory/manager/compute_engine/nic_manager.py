@@ -4,18 +4,16 @@ from spaceone.inventory.model.nic import NIC
 
 class NICManager(BaseManager):
 
-    def __init__(self, params, vm_connector=None):
+    def __init__(self, params):
         self.params = params
-        self.vm_connector = vm_connector
 
-    def get_nic_info(self, network_interfaces, subnet_vo):
+    def get_nic_info(self, instance, subnet_vo):
         '''
         nic_data = {
             "device_index": 0,
             "device": "",
-            "nic_type": "",
-            "ip_addresses": [],
             "cidr": "",
+            "ip_addresses": [],
             "mac_address": "",
             "public_ip_address": "",
             "tags": {
@@ -23,48 +21,39 @@ class NICManager(BaseManager):
             }
         }
         '''
-
         nics = []
-        for net_inf in network_interfaces:
+        network_interfaces = instance.get('network_interfaces', [])
+        for idx, network in enumerate(network_interfaces):
+            ip_addresses, public_ip = self._get_ip_addresses(network)
             nic_data = {
-                'ip_addresses': self.get_private_ips(net_inf.get('PrivateIpAddresses', [])),
-                'device': self.get_device(net_inf),
-                'nic_type': net_inf.get('InterfaceType', ''),
-                'cidr': subnet_vo.cidr,
-                # 'mac_address': net_inf.get('MacAddress'),   # NO DATA
-                'public_ip_address': net_inf.get('Association', {}).get('PublicIp', ''),
-                'tags': {
-                    'public_dns': net_inf.get('Association', {}).get('PublicDnsName', '')
-                }
+                'device_index': idx,
+                'ip_addresses': ip_addresses,
+                'device': '',
+                'nic_type': 'Virtual',
+                'cidr': subnet_vo.get('subnet_vo'),
+                'public_ip_address': public_ip,
+                'tags': {}
             }
-
-            if 'Attachment' in net_inf and 'DeviceIndex' in net_inf.get('Attachment'):
-                nic_data.update({
-                    'device_index': net_inf['Attachment']['DeviceIndex']
-                })
-
-            # eip = self.match_eip_from_instance_id(instance_id, eips)
-            #
-            # if eip is not None:
-            #     nic_data.update({
-            #         'public_ip_address': eip.get('PublicIp', '')
-            #     })
 
             nics.append(NIC(nic_data, strict=False))
 
         return nics
 
     @staticmethod
-    def get_private_ips(private_ips):
-        return [ip.get('PrivateIpAddress') for ip in private_ips if ip.get('PrivateIpAddress') is not None]
+    def _get_ip_addresses(network):
+        ip_addresses = []
+        public_ip_address = ''
+        private_ip = network.get('networkIP', '')
+        access_configs = network.get('accessConfigs', [])
+        if private_ip != '':
+            ip_addresses.append(private_ip)
 
-    @staticmethod
-    def get_device(net_inf):
-        return ""
+        for idx, access_config in enumerate(access_configs):
+            nat_ip = access_config.get('natIP', '')
+            if nat_ip != '':
+                ip_addresses.append(nat_ip)
+                if idx == 0:
+                    public_ip_address = nat_ip
 
-    def match_eip_from_instance_id(self, instance_id, eips):
-        for eip in eips:
-            if eip.get('InstanceId') == instance_id:
-                return eip
+        return ip_addresses, public_ip_address
 
-        return None

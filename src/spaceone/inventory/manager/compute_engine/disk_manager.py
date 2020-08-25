@@ -46,7 +46,7 @@ class DiskManager(BaseManager):
                     'write_iops': self.get_iops_rate(single_disk_type, disk_sz, 'write'),
                     'read_throughput': self.get_throughput_rate(single_disk_type, disk_sz),
                     'write_throughput': self.get_throughput_rate(single_disk_type, disk_sz),
-                    'labels': self.get_labels(matching_single_disk_tag)
+                    'labels': matching_single_disk_tag.get('labels', {})
                 })
 
             single_disk = {

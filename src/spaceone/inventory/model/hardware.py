@@ -21,11 +21,8 @@ from schematics.types import IntType, FloatType, StringType, ListType, BooleanTy
     },
 '''
 
-
 class Hardware(Model):
     core = IntType(default=0)
     memory = FloatType(default=0.0)
     is_vm = StringType(default=True)
     cpu_model = ListType(StringType(default=""))
-
-    # get_instance_type =

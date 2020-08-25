@@ -214,8 +214,6 @@ from schematics.types import StringType, ModelType, DateTimeType
 }
 
 '''
-
-
 class InstanceGroup(Model):
     id = StringType()
     self_link = StringType()
