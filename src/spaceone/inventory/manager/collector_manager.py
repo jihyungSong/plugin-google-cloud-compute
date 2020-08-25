@@ -54,7 +54,7 @@ class CollectorManager(BaseManager):
             # Get Instance Type for GCP
 
             instance_group = gcp_connector.list_instance_group_managers()
-            instance_types = gcp_connector.list_instance_types()
+            instance_types = gcp_connector.list_machine_types()
 
             # Image
             images = gcp_connector.list_images()

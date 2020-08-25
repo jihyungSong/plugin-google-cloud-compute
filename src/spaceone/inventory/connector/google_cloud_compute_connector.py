@@ -57,8 +57,6 @@ class GoogleCloudComputeConnector(BaseConnector):
     def list_instances(self, **query):
         status_filter = {'key': 'status', 'values': ['STAGING', 'RUNNING', 'STOPPING', 'REPAIRING']}
 
-        # filter 는 반드시 list 인가?
-
         if 'filter' in query:
             query.get('filter').append(status_filter)
         else:
@@ -69,7 +67,7 @@ class GoogleCloudComputeConnector(BaseConnector):
         compute_instances = result.get('items', [])
         return compute_instances
 
-    def list_instance_types(self, **query):
+    def list_machine_types(self, **query):
         query = self.generate_query(is_default=True, **query)
         result = self.client.machineTypes().list(**query).execute()
         instance_types = result.get('items', [])
