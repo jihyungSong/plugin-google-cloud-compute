@@ -9,7 +9,8 @@ class LoadBalancerManager(BaseManager):
         self.params = params
         self.vm_connector: GoogleCloudComputeConnector = vm_connector
 
-    def get_load_balancer_info(self, load_balancers, target_groups, instance_id=None, instance_ip=None):
+    def get_load_balancer_info(self, instance, instance_groups, backend_svc, url_maps, target_pools, forwarding_rules):
+
         # type = StringType(choices=('HTTP', 'TCP', 'UDP'))
         # name = StringType()
         # dns = StringType(default="")
@@ -35,68 +36,118 @@ class LoadBalancerManager(BaseManager):
         ]
         '''
         load_balancer_data_list = []
-        match_load_balancers = self.get_load_balancers_from_instance_id(instance_id, instance_ip,
-                                                                        load_balancers, target_groups)
+        matched_group = self.get_matched_instance_group(instance, instance_groups)
+        if matched_group is not None:
+            matched_http_backend_svcs = self.get_matched_backend_svc_for_http(matched_group, backend_svc, url_maps)
+            matched_lb_infos = matched_http_backend_svcs
+            for matched_lb_info in matched_lb_infos:
+                lb_info = matched_lb_info.get('lb_info', {})
+                protocol = matched_lb_info.get('protocol', '')
+                lb_data = {
+                    'type': protocol,
+                    'name': lb_info.get('name', ''),
+                    'dns': '',
+                    'scheme': matched_lb_info.get('loadBalancingScheme', ''),
+                    'port': [matched_lb_info.get('port', '')] if matched_lb_info.get('port', '') != '' else [],
+                    'protocol': [protocol] if protocol != '' else [],
+                    'tags': {}
+                }
+                load_balancer_data_list.append(LoadBalancer(lb_data, strict=False))
+        matched_target_pools = self._get_matched_target_pool(instance, target_pools)
 
-        for match_load_balancer in match_load_balancers:
-            load_balancer_data = {
-                'dns': match_load_balancer.get('DNSName', ''),
-                'type': match_load_balancer.get('Type'),
-                'arn': match_load_balancer.get('LoadBalancerArn'),
-                'scheme': match_load_balancer.get('Scheme'),
-                'name': match_load_balancer.get('LoadBalancerName', ''),
-                'protocol': [listener.get('Protocol') for listener in match_load_balancer.get('listeners', []) if listener.get('Protocol') is not None],
-                'port': [listener.get('Port') for listener in match_load_balancer.get('listeners', []) if listener.get('Port') is not None],
-            }
+        if len(matched_target_pools) > 0:
+            lbs_by_fd_rules = self._get_matched_forwarding_rules(matched_target_pools, forwarding_rules)
+            for lbs_by_fd_rule in lbs_by_fd_rules:
+                lb_info = matched_lb_info.get('lb_info', {})
+                protocol = lbs_by_fd_rule.get('IPProtocol', '')
+                lb_data = {
+                    'type': protocol,
+                    'name': lb_info.get('name', ''),
+                    'dns': '',
+                    'scheme': lbs_by_fd_rule.get('loadBalancingScheme', ''),
+                    'port': self._get_port_ranges_into_array(lbs_by_fd_rule),
+                    'protocol': [protocol] if protocol != '' else [],
+                    'tags': {}
+                }
+                load_balancer_data_list.append(LoadBalancer(lb_data, strict=False))
 
-            load_balancer_data_list.append(LoadBalancer(load_balancer_data, strict=False))
 
         return load_balancer_data_list
 
-    def get_load_balancers_from_instance_id(self, instance_id, instance_ip, load_balancers, target_groups):
-        matched_lb_arns = []
-        match_load_balancers = []
-        match_target_groups = self.match_target_groups(target_groups, instance_id, instance_ip)
+    def get_matched_backend_svc_for_http(self, matched_group, backend_svcs, url_maps):
+        matched_backend_svc = []
+        instance_group_key = self._get_matching_str('instanceGroup', matched_group)
+        for backend_svc in backend_svcs:
+            backends = backend_svc.get('backends', [])
+            selected_url_map = self._get_lb_name_from_backend_svc(backend_svc.get('selfLink', ''), url_maps)
+            if backend_svc.get('protocol', '') in ['HTTP', 'HTTPS'] and selected_url_map is not None:
+                for backend in backends:
+                    group_name = backend.get('group', '')
+                    if instance_group_key in group_name:
+                        backend_svc.update({
+                            'lb_info': selected_url_map
+                        })
+                        matched_backend_svc.append(backend_svc)
+                        break
 
-        for match_tg in match_target_groups:
-            for lb in self.match_load_balancers(load_balancers, match_tg.get('LoadBalancerArns', [])):
-                if lb.get('LoadBalancerArn') not in matched_lb_arns:
-                    match_load_balancers.append(lb)
-                    matched_lb_arns.append(lb.get('LoadBalancerArn'))
+        return matched_backend_svc
 
-        return match_load_balancers
+    def get_matched_instance_group(self, instance, instance_groups):
+        matched_instance_group = None
+        for instance_group in instance_groups:
+            find = False
+            instance_list = instance_group.get('instance_list', [])
+            for single_inst in instance_list:
+                instance_name = self._get_key_name('instance', single_inst)
+                if instance.get('name') == instance_name:
+                    matched_instance_group = instance_group
+                    find = True
+                    break
+            if find:
+                break
+        return matched_instance_group
 
-    def match_target_groups(self, target_groups, instance_id, instance_ip):
-        match_target_groups = []
+    @staticmethod
+    def _get_matching_str(key, matching_item):
+        matching_string = matching_item.get(key, '')
+        return matching_string[matching_string.find('/projects/'):len(matching_string)] \
+            if matching_string != '' else None
 
-        for target_group in target_groups:
-            target_group_arn = target_group.get('TargetGroupArn')
-            target_type = target_group.get('TargetType')                                # instance | ip | lambda
+    @staticmethod
+    def _get_lb_name_from_backend_svc(self_link, url_maps):
+        selected_url_map = None
+        for url_map in url_maps:
+            if self_link == url_map.get('defaultService', ''):
+                selected_url_map = url_map
+                break
+        return selected_url_map
 
-            for th in target_group.get('target_healths'):
-                target = th.get('Target', {})
-                target_id = target.get('Id')
+    @staticmethod
+    def _get_matched_target_pool(instance, target_pools):
+        instance_contained_pools = []
+        for target_pool in target_pools:
+            inst_self_link = instance.get('selfLink', '')
+            if any(inst_self_link in s for s in target_pool.get('instances', [])):
+                instance_contained_pools.append(target_pool)
+        return instance_contained_pools
 
-                if target_id is not None and target_id not in match_target_groups:
-                    if target_type == 'instance' and instance_id == target_id:
-                        match_target_groups.append(target_group)
-                    elif target_type == 'ip' and instance_ip == target_id:
-                        match_target_groups.append(target_group)
-
-        return match_target_groups
-
-    def match_load_balancers(self, load_balancers, lb_arns):
-        match_load_balancers = []
-
-        for lb_arn in lb_arns:
-            for lb in load_balancers:
-                if lb.get('LoadBalancerArn') == lb_arn:
-                    lb.update({
-                        'listeners': self.get_listeners(lb_arn)
+    @staticmethod
+    def _get_matched_forwarding_rules(target_pools, forwarding_ruls):
+        matched_forwarding_rule = []
+        for target_pool in target_pools:
+            self_link = target_pool.get('selfLink', '')
+            for forwarding_rule in forwarding_ruls:
+                target = forwarding_rule.get('target', '')
+                if self_link == target:
+                    forwarding_rule.update({
+                        'lb_info': target_pool
                     })
-                    match_load_balancers.append(lb)
+                    matched_forwarding_rule.append(forwarding_rule)
+        return matched_forwarding_rule
 
-        return match_load_balancers
+    @staticmethod
+    def _get_port_ranges_into_array(lbs_by_fd_rule):
+        port_range = lbs_by_fd_rule.get('portRange')
+        ports = port_range.split('-') if port_range.find('-') > 0 else int(port_range)
+        return list(range(int(ports[0]), int(ports[1])+1)) if isinstance(ports, list) and len(ports) == 2 else [ports]
 
-    def get_listeners(self, lb_arn):
-        return self.ec2_connector.list_listners(lb_arn)
