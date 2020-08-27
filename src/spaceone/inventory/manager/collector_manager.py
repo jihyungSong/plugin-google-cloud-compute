@@ -74,18 +74,23 @@ class CollectorManager(BaseManager):
         # Security Group (Firewall)
         security_groups = global_resources.get('firewalls', [])
 
-        # Get Instance Groups
-        instance_group = self.gcp_connector.list_instance_group_managers(zone=zone)
+        # Instance Group Managers
+        instance_group_managers = global_resources.get('instance_group_managers', [])
 
-        # Get Machine Types
-        instance_types = self.gcp_connector.list_machine_types(zone=zone)
+        # Machine Types
+        machine_types = global_resources.get('machine_types', [])
 
-        # Autoscaling group list
-        auto_scaler = self.gcp_connector.list_auto_scalers(zone=zone)
+        # Auto Scalers
+        auto_scalers = global_resources.get('auto_scalers', [])
 
-        # disks
-        disks = self.gcp_connector.list_disk(zone=zone)
-        disk_types = self.gcp_connector.list_disk_types(zone=zone)
+        # Disks
+        disks = global_resources.get('disks', [])
+
+        # Disk Types
+        disk_types = global_resources.get('disk_types', [])
+
+        # TODO: 여기에 구현
+
 
         return ''
 
@@ -215,6 +220,14 @@ class CollectorManager(BaseManager):
         zone_info = params['zone_info']
         instances = params.get('instances', [])
         global_resources = params['resources']
+
+        global_resources.update({
+            'instance_group_managers': self.gcp_connector.list_instance_group_managers(zone=zone_info['zone']),
+            'machine_types': self.gcp_connector.list_machine_types(zone=zone_info['zone']),
+            'auto_scalers': self.gcp_connector.list_auto_scalers(zone=zone_info['zone']),
+            'disks': self.gcp_connector.list_disk(zone=zone_info['zone']),
+            'disk_types': self.gcp_connector.list_disk_types(zone=zone_info['zone'])
+        })
 
         resources = [self.get_instance(zone_info, instance, global_resources) for instance in instances]
         print(f'   [{params["zone_info"]["zone"]}] Finished {time.time() - start_time} Seconds')
