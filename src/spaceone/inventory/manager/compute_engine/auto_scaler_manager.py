@@ -29,6 +29,7 @@ class AutoScalerManager(BaseManager):
     def get_matched_instance_group(self, instance, instance_groups):
         matched_instance_group = None
         for instance_group in instance_groups:
+            find = False
             instance_list = instance_group.get('instance_list', [])
             for single_inst in instance_list:
                 instance_name = self._get_key_name('instance', single_inst)
