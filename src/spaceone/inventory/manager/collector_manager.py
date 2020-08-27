@@ -6,7 +6,7 @@ import concurrent.futures
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
-    DiskManager, NICManager, VPCManager, SecurityGroupRuleManager
+    DiskManager, NICManager, VPCManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
 from spaceone.inventory.model.server import Server
 from spaceone.inventory.model.region import Region
@@ -244,7 +244,7 @@ class CollectorManager(BaseManager):
             'connector': GoogleCloudComputeConnector
         }
         '''
-        print(f"[START] LIST Subnet {params['region']}")
+        # print(f"[START] LIST Subnet {params['region']}")
         # connector: GoogleCloudComputeConnector = params['connector']
         # subnets = connector.list_subnets(region=params['region'])
         # print(f"[END] {params['region']}")
@@ -259,7 +259,7 @@ class CollectorManager(BaseManager):
             'connector': GoogleCloudComputeConnector
         }
         '''
-        print(f"LIST Forwarding Rules START.. {params['region']}")
+        # print(f"LIST Forwarding Rules START.. {params['region']}")
         # connector: GoogleCloudComputeConnector = params['connector']
         # frules = connector.list_forwarding_rules(region=params['region'])
         # print(f"[END] {params['region']}")
