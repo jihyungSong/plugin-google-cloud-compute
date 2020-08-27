@@ -126,33 +126,68 @@ class CollectorService(BaseService):
         region_resource_format = {'resource_type': 'inventory.Region',
                                   'match_rules': {'1': ['region_code', 'region_type']}}
 
-        zone_independent_resources = self.collector_manager.get_zone_independent_resources(params['secret_data'],
-                                                                                           all_regions)
-
         # parameter setting for multi threading
-        mt_params = self.set_params_for_zones(params, all_regions, zone_independent_resources)
+        mt_params = self.set_params_for_zones(params, all_regions)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
-            future_executors = []
-            for mt_param in mt_params:
-                future_executors.append(executor.submit(self.collector_manager.list_resources, mt_param))
+        # TODO: parallel collecting instances through multi threading
+        target_params = []
+        is_instance = False
+        for params in mt_params:
+            _instances = self.collector_manager.list_instances_only(params)
 
-            for future in concurrent.futures.as_completed(future_executors):
-                for result in future.result():
-                    collected_region = self.collector_manager.get_region_from_result(result)
+            if _instances:
+                params.update({
+                    'instances':  _instances
+                })
 
-                    if collected_region is not None and collected_region.region_code not in collected_region_code:
-                        resource_regions.append(collected_region)
-                        collected_region_code.append(collected_region.region_code)
+                target_params.append(params)
+                is_instance = True
 
-                    yield result, server_resource_format
+        if is_instance:
+            global_resources = self.collector_manager.get_global_resources(params['secret_data'], all_regions)
 
-        for resource_region in resource_regions:
-            yield resource_region, region_resource_format
+            resources = []
+            for params in target_params:
+                params.update({
+                    'resources': global_resources
+                })
+
+                resources.extend(self.collector_manager.list_resources(params))
+
+            for resource in resources:
+                collected_region = self.collector_manager.get_region_from_result(resource)
+
+                if collected_region and collected_region.region_code not in collected_region_code:
+                    resource_regions.append(collected_region)
+                    collected_region_code.append(collected_region.region_code)
+
+                yield resource, server_resource_format
+
+            for resource_region in resource_regions:
+                yield resource_region, region_resource_format
+
+        #
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+        #     future_executors = []
+        #     for mt_param in mt_params:
+        #         future_executors.append(executor.submit(self.collector_manager.list_resources, mt_param))
+        #
+        #     for future in concurrent.futures.as_completed(future_executors):
+        #         for result in future.result():
+        #             collected_region = self.collector_manager.get_region_from_result(result)
+        #
+        #             if collected_region is not None and collected_region.region_code not in collected_region_code:
+        #                 resource_regions.append(collected_region)
+        #                 collected_region_code.append(collected_region.region_code)
+        #
+        #             yield result, server_resource_format
+        #
+        # for resource_region in resource_regions:
+        #     yield resource_region, region_resource_format
 
         print(f'############## TOTAL FINISHED {time.time() - start_time} Sec ##################')
 
-    def set_params_for_zones(self, params, all_regions, resources):
+    def set_params_for_zones(self, params, all_regions):
         print("[ SET Params for ZONES ]")
         params_for_zones = []
 
@@ -160,16 +195,16 @@ class CollectorService(BaseService):
         target_zones = self.get_all_zones(params.get('secret_data', ''), filter_region_name, all_regions)
 
         for target_zone in target_zones:
-            _conn = self.locator.get_connector('GoogleCloudComputeConnector')
-            _conn.get_connect(params['secret_data'])
+            # _conn = self.locator.get_connector('GoogleCloudComputeConnector')
+            # _conn.get_connect(params['secret_data'])
 
             params_for_zones.append({
-                'connector': _conn,
+                # 'connector': _conn,
                 'zone_info': target_zone,
                 'query': query,
                 'secret_data': params['secret_data'],
                 'instance_ids': instance_ids,
-                'resources': resources
+                # 'resources': resources
             })
 
         return params_for_zones
