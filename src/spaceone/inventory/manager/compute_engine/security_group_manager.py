@@ -1,127 +1,145 @@
+from itertools import product
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.security_group import SecurityGroup
 
 
-class SecurityGroupRuleManager(BaseManager):
+class SecurityGroupManager(BaseManager):
 
-    def __init__(self, params, vm_connector=None):
+    def __init__(self, params):
         self.params = params
-        self.ec2_connector = vm_connector
 
-    def get_security_group_rules_info(self, security_group_ids, security_groups):
+    def get_security_group_rules_info(self, instance, firewalls):
         '''
         "data.security_group_rules" = [
                     {
-                        "protocol": "",
-                        "security_group_name": "",
-                        "port_range_min": 0,
-                        "port_range_max": 65535,
-                        "security_group_id": "",
-                        "description": "",
-                        "direction": "inbound" | "outbound",
-                        "port": "",
-                        "remote": "",
-                        "remote_id": "",
-                        "remote_cidr": "",
+                        priority = IntType(serialize_when_none=False)
+                        protocol = StringType()
+                        remote = StringType()                                   # mimic
+                        remote_id = StringType(serialize_when_none=False)       # filter value
+                        remote_cidr = StringType(serialize_when_none=False)     # cidr
+                        security_group_name = StringType(default="")
+                        port_range_min = IntType(serialize_when_none=False)
+                        port_range_max = IntType(serialize_when_none=False)
+                        security_group_id = StringType()
+                        description = StringType(default="")
+                        direction = StringType(choices=("inboud", "outbound"))
+                        port = StringType(serialize_when_none=False)
+                        action = StringType(choices=('allow', 'deny'))
                     }
                 ],
         '''
-
         sg_rules = []
-        match_security_groups = self.match_security_group_from_ids(security_group_ids, security_groups)
+        inst_svc_accounts = self._get_svc_account_infos(instance)
+        inst_network_info = self._get_instance_network_info(instance)
 
-        for match_sg in match_security_groups:
-            # INBOUND
-            for inbound_rule in match_sg.get('IpPermissions', []):
-                sg_data = self.set_sg_rule_base_data(match_sg, 'inbound', inbound_rule)
+        for firewall in firewalls:
+            if firewall.get('network', '') in inst_network_info:
+                for fire_wall_target_tag in firewall.get('targetTags', []):
+                    if fire_wall_target_tag in self._get_tag_item_list(instance) \
+                            or fire_wall_target_tag == 'allow-all-instance':
+                        protocol_ports_list = self.get_allowed_or_denied_info(firewall)
+                        self.append_security_group(protocol_ports_list, firewall, sg_rules)
 
-                for ip_range in inbound_rule.get('IpRanges', []):
-                    sg_data.update(self.set_ip_range_data(ip_range))
-                    sg_rules.append(SecurityGroup(sg_data, strict=False))
+            elif "targetServiceAccounts" in firewall:
+                for firewall_target_service_account in firewall.get('targetServiceAccounts', []):
+                    if firewall_target_service_account in inst_svc_accounts or \
+                            fire_wall_target_tag == 'allow-all-instance':
+                        protocol_ports_list = self.get_allowed_or_denied_info(firewall)
+                        self.append_security_group(protocol_ports_list, firewall, sg_rules)
 
-                for group_pair in inbound_rule.get('UserIdGroupPairs', []):
-                    sg_data.update(self.set_group_pairs_data(group_pair))
-                    sg_rules.append(SecurityGroup(sg_data, strict=False))
-
-            # OUTBOUND
-            for outbound_rules in match_sg.get('IpPermissionsEgress', []):
-                sg_data = self.set_sg_rule_base_data(match_sg, 'outbound', outbound_rules)
-
-                for ip_range in outbound_rules.get('IpRanges', []):
-                    sg_data.update(self.set_ip_range_data(ip_range))
-                    sg_rules.append(SecurityGroup(sg_data, strict=False))
-
-                for group_pair in outbound_rules.get('UserIdGroupPairs', []):
-                    sg_data.update(self.set_group_pairs_data(group_pair))
-                    sg_rules.append(SecurityGroup(sg_data, strict=False))
+            elif "targetTags" not in firewall and "targetServiceAccounts" not in firewall:
+                pass
 
         return sg_rules
 
-    def set_sg_rule_base_data(self, sg, direction, rule):
-        sg_rule_data = {
-            'direction': direction,
-            'protocol': self._get_protocol(rule.get('IpProtocol')),
-            'security_group_name': sg.get('GroupName', ''),
-            'security_group_id': sg.get('GroupId'),
-        }
+    def append_security_group(self, protocol_ports_list, firewall, sg_rules):
+        for protocol_ports in protocol_ports_list:
+            sg_dict = self._get_sg_dict(protocol_ports, firewall)
+            if 'port' in protocol_ports:
+                sg_dict.update({'port': protocol_ports.get('port')})
 
-        from_port, to_port, port = self._get_port(rule)
+            sg_list = (dict(zip(sg_dict, x)) for x in product(*sg_dict.values()))
 
-        if from_port is not None:
-            sg_rule_data.update({
-                'port_range_min': from_port,
-                'port_range_max': to_port,
-                'port': port
-            })
+            for sg_single in sg_list:
+                min_port, max_port = self._port_min_and_max(sg_single)
 
-        return sg_rule_data
+                if min_port is not None:
+                    sg_single.update({'port_range_min': min_port})
+                if max_port is not None:
+                    sg_single.update({'port_range_max': max_port})
 
-    def set_ip_range_data(self, ip_range):
-        return {
-            'remote_cidr': ip_range.get('CidrIp'),
-            'remote': ip_range.get('CidrIp'),
-            'description': ip_range.get('Description', '')
-        }
+                remote_cidr = sg_single.get('remote_cidr', '')
+                remote_id = sg_single.get('remote_id', '')
 
-    def set_group_pairs_data(self, group_pair):
-        return {
-            'remote_id': group_pair.get('GroupId'),
-            'remote': group_pair.get('GroupId'),
-            'description': group_pair.get('Description', '')
-        }
+                sg_single.update({
+                    'priority': firewall.get('priority', 0),
+                    'direction': 'inbound' if 'INGRESS' == firewall.get('direction', '') else 'outbound',
+                    'description': firewall.get('description', ''),
+                    'action': 'allow' if 'allowed' in firewall else 'deny',
+                    'security_group_name': firewall.get('name', ''),
+                    'security_group_id': firewall.get('id', ''),
+                    'remote': remote_cidr if remote_cidr != '' else remote_id
+                })
+                sg_rules.append(sg_single)
 
-    @staticmethod
-    def match_security_group_from_ids(sg_ids, security_groups):
-        return [security_group for security_group in security_groups if security_group['GroupId'] in sg_ids]
-
-    @staticmethod
-    def _get_protocol(protocol):
-        if protocol == '-1':
-            return 'ALL'
-        elif protocol == 'tcp':
-            return 'TCP'
-        elif protocol == 'udp':
-            return 'UDP'
-        elif protocol == 'icmp':
-            return 'ICMP'
+    def get_allowed_or_denied_info(self, firewall):
+        if 'allowed' in firewall:
+            return self._get_proto_in_format('allowed', firewall)
         else:
-            return protocol
+            return self._get_proto_in_format('denied', firewall)
 
     @staticmethod
-    def _get_port(rule):
-        protocol = rule.get('IpProtocol')
+    def _get_sg_dict(protocol_ports, firewall):
+        remote_cidr = firewall.get('sourceRanges', [])
+        remote_id = firewall.get('sourceTags', [])
+        sg_dict = {'protocol': protocol_ports.get('protocol')}
 
-        if protocol == '-1':
-            return 0, 65535, '0 - 65535'
-        elif protocol in ['tcp', 'udp', 'icmp']:
-            from_port = rule.get('FromPort')
-            to_port = rule.get('ToPort')
+        if len(remote_cidr) > 0:
+            sg_dict.update({'remote_cidr': remote_cidr})
+        if len(remote_id) > 0:
+            sg_dict.update({'remote_id': remote_id})
 
-            if from_port == to_port:
-                port = from_port
+        return sg_dict
+
+
+    @staticmethod
+    def _port_min_and_max(sg_single):
+        port = sg_single.get('port', None)
+        if port is not None:
+            return None, None
+        else:
+            striped_port = port.replace(' ', '')
+            port_split = striped_port.split('-')
+            if len(port_split) > 1:
+                return int(port_split[0]), int(port_split[1])
             else:
-                port = f'{from_port} - {to_port}'
+                return int(port_split[0]), int(port_split[0])
 
-            return from_port, to_port, port
-        else:
-            return None, None, None
+    @staticmethod
+    def _get_instance_network_info(instance):
+        inst_network_interfaces = instance.get('networkInterfaces', [])
+        return [d.get('network') for d in inst_network_interfaces if d.get('network', '') != '']
+
+    @staticmethod
+    def _get_svc_account_infos(instance):
+        svc_accounts = instance.get('serviceAccounts', [])
+        return [d.get('email') for d in svc_accounts if d.get('email', '') != '']
+
+    @staticmethod
+    def _get_tag_item_list(instance):
+        inst_tags = instance.get('tags', {})
+        return inst_tags.get('items', [])
+
+    @staticmethod
+    def _get_proto_in_format(flag, firewall):
+        protocol_port_list = []
+        for proto in firewall.get(flag, []):
+            protocol = proto.get('IPProtocol', [])
+            ports = proto.get('ports', None)
+            item = {'protocol': protocol if isinstance(protocol, list) else [protocol]}
+            if protocol == 'all':
+                item.update({'port': '0-65535'})
+            if ports is not None:
+                item.update({'port': ports})
+            protocol_port_list.append(item)
+        return protocol_port_list
