@@ -1,7 +1,7 @@
 from itertools import product
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.security_group import SecurityGroup
-
+from pprint import pprint
 
 class SecurityGroupManager(BaseManager):
 
@@ -36,14 +36,14 @@ class SecurityGroupManager(BaseManager):
             if firewall.get('network', '') in inst_network_info:
                 for fire_wall_target_tag in firewall.get('targetTags', []):
                     if fire_wall_target_tag in self._get_tag_item_list(instance) \
-                            or fire_wall_target_tag == 'allow-all-instance':
+                            or 'allow-all-instance' in fire_wall_target_tag:
                         protocol_ports_list = self.get_allowed_or_denied_info(firewall)
                         self.append_security_group(protocol_ports_list, firewall, sg_rules)
 
             elif "targetServiceAccounts" in firewall:
                 for firewall_target_service_account in firewall.get('targetServiceAccounts', []):
                     if firewall_target_service_account in inst_svc_accounts or \
-                            fire_wall_target_tag == 'allow-all-instance':
+                            'allow-all-instance' in fire_wall_target_tag:
                         protocol_ports_list = self.get_allowed_or_denied_info(firewall)
                         self.append_security_group(protocol_ports_list, firewall, sg_rules)
 
@@ -80,7 +80,8 @@ class SecurityGroupManager(BaseManager):
                     'security_group_id': firewall.get('id', ''),
                     'remote': remote_cidr if remote_cidr != '' else remote_id
                 })
-                sg_rules.append(sg_single)
+                pprint(sg_single)
+                sg_rules.append(SecurityGroup(sg_single, strict=False))
 
     def get_allowed_or_denied_info(self, firewall):
         if 'allowed' in firewall:
@@ -106,14 +107,14 @@ class SecurityGroupManager(BaseManager):
     def _port_min_and_max(sg_single):
         port = sg_single.get('port', None)
         if port is not None:
-            return None, None
-        else:
             striped_port = port.replace(' ', '')
             port_split = striped_port.split('-')
             if len(port_split) > 1:
                 return int(port_split[0]), int(port_split[1])
             else:
                 return int(port_split[0]), int(port_split[0])
+        else:
+            return None, None
 
     @staticmethod
     def _get_instance_network_info(instance):

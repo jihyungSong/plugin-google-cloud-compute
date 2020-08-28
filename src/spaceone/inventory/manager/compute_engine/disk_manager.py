@@ -1,7 +1,6 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.disk import Disk
 
-
 class DiskManager(BaseManager):
     def __init__(self):
         pass
@@ -58,6 +57,7 @@ class DiskManager(BaseManager):
             }
 
             disks.append(Disk(single_disk, strict=False))
+
         return disks
 
     def get_iops_rate(self, disk_type, disk_size, flag):

@@ -58,18 +58,6 @@ class CollectorManager(BaseManager):
     def get_instance(self, zone_info, instance, global_resources):
         zone = zone_info['zone']
 
-        # 'images': images,
-        # 'vpcs': vpcs,
-        # 'subnets': subnets,
-        # 'fire_walls': fire_walls,
-        # 'forwarding_rules': forwarding_rules,
-        # 'target_pools': target_pools,
-        # 'url_maps': url_maps,
-        # 'backend_svcs': backend_svcs
-
-        # Images
-        images = global_resources.get('images', [])
-
         # VPC
         vpcs = global_resources.get('vpcs', [])
         subnets = global_resources.get('subnets', [])
@@ -82,7 +70,7 @@ class CollectorManager(BaseManager):
         forwarding_rules = global_resources.get('forwarding_rules', [])
 
         # Security Group (Firewall)
-        firewalls = global_resources.get('firewalls', [])
+        firewalls = global_resources.get('fire_walls', [])
 
         # Get Instance Groups
         instance_group = self.gcp_connector.list_instance_group_managers(zone=zone)
@@ -96,7 +84,8 @@ class CollectorManager(BaseManager):
 
         # disks
         disks = self.gcp_connector.list_disk(zone=zone)
-        disk_types = self.gcp_connector.list_disk_types(zone=zone)
+        # if distro has additonary
+        # disk_types = self.gcp_connector.list_disk_types(zone=zone)
 
         # call_up all the managers
         vm_instance_manager: VMInstanceManager = VMInstanceManager()
@@ -110,12 +99,18 @@ class CollectorManager(BaseManager):
 
         server_data = vm_instance_manager.get_server_info(instance, instance_types, disks, zone_info)
         auto_scaler_vo = auto_scaler_manager.get_auto_scaler_info(instance, instance_group, auto_scaler)
-        load_balancer_vos = lb_manager.get_load_balancer_info(instance, instance_group, backend_svcs, url_maps, target_pools, forwarding_rules)
-        disk_vos = disk_manager.get_disk_info(instance, disks)
-        vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
-        nic_vos = nic_manager.get_nic_info(instance, subnet_vo)
-        sg_rules_vos = security_group_manager.get_security_group_rules_info(instance, firewalls)
 
+        load_balancer_vos = lb_manager.get_load_balancer_info(instance, instance_group, backend_svcs, url_maps, target_pools, forwarding_rules)
+
+        disk_vos = disk_manager.get_disk_info(instance, disks)
+
+        vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
+
+
+        nic_vos = nic_manager.get_nic_info(instance, subnet_vo)
+
+        sg_rules_vos = security_group_manager.get_security_group_rules_info(instance, firewalls)
+        pprint(sg_rules_vos)
         server_data.update({
             'nics': nic_vos,
             'disks': disk_vos,
@@ -132,13 +127,7 @@ class CollectorManager(BaseManager):
             '_metadata': meta_manager.get_metadata(),
         })
 
-        # print('-----Server_data------')
-        # print()
-        # pprint(server_data)
-        # print()
-        # print('----------------------')
-
-        return server_data
+        return (Server(server_data, strict=False))
 
     def list_resources(self, params):
         '''

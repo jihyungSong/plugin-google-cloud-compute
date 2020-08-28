@@ -46,7 +46,7 @@ class VPCManager(BaseManager):
                 'cidr': matched_subnet.get('ipCidrRange', ''),
                 'subnet_name': matched_subnet.get('name', ''),
                 'gateway_address': matched_subnet.get('gatewayAddress', ''),
-                'vpc': matched_vpc,
+                'vpc': vpc_data,
                 'self_link': matched_subnet.get('selfLink', '')
             })
 
@@ -54,10 +54,10 @@ class VPCManager(BaseManager):
 
     def get_matching_vpc(self, matched_subnet, vpcs):
         matching_vpc = None
-        network = self._get_network_str(matched_subnet)
+        network = matched_subnet.get('selfLink', None)
         if network is not None:
             for vpc in vpcs:
-                if any(network in s for s in vpc.get('subnetworks', [])):
+                if network in vpc.get('subnetworks', []):
                     matching_vpc = vpc
                     break
 

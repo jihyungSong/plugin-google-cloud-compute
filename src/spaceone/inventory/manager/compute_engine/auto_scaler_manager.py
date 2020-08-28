@@ -1,6 +1,5 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.auto_scaler import AutoScaler
-
 class AutoScalerManager(BaseManager):
     def __init__(self):
         pass
@@ -21,6 +20,7 @@ class AutoScalerManager(BaseManager):
         '''
         matched_inst_group = self.get_matched_instance_group(instance, instance_group_managers)
         auto_scaler_data = self._get_auto_scaler_data(matched_inst_group, auto_scalers)
+
         if auto_scaler_data is not None:
             return AutoScaler(auto_scaler_data, strict=False)
         else:
@@ -48,7 +48,8 @@ class AutoScalerManager(BaseManager):
         if matched_inst_group is not None:
             for auto_scaler in auto_scalers:
                 auto_scaler_self_link = auto_scaler.get('selfLink', '')
-                if auto_scaler_self_link == matched_inst_group.get('autoscaler', ''):
+                matched_status = matched_inst_group.get('status', {})
+                if auto_scaler_self_link == matched_status.get('autoscaler', ''):
                     auto_scaler_data = {
                         'name': auto_scaler.get('name', ''),
                         'id': auto_scaler.get('id', ''),
@@ -56,7 +57,7 @@ class AutoScalerManager(BaseManager):
                         'instance_group': {
                             'id': matched_inst_group.get('id', ''),
                             'name': matched_inst_group.get('name', ''),
-                            'self_link': matched_inst_group.get('self_link', ''),
+                            'self_link': matched_inst_group.get('selfLink', ''),
                             'instance_template_name': matched_inst_group.get('instanceTemplate', ''),
                         }
                     }

@@ -41,6 +41,7 @@ class LoadBalancerManager(BaseManager):
                     'protocol': [protocol] if protocol != '' else [],
                     'tags': {}
                 }
+
                 load_balancer_data_list.append(LoadBalancer(lb_data, strict=False))
 
         matched_target_pools = self._get_matched_target_pool(instance, target_pools)
@@ -59,6 +60,7 @@ class LoadBalancerManager(BaseManager):
                     'protocol': [protocol] if protocol != '' else [],
                     'tags': {}
                 }
+
                 load_balancer_data_list.append(LoadBalancer(lb_data, strict=False))
 
 

@@ -22,7 +22,7 @@ class NICManager(BaseManager):
         }
         '''
         nics = []
-        network_interfaces = instance.get('network_interfaces', [])
+        network_interfaces = instance.get('networkInterfaces', [])
         for idx, network in enumerate(network_interfaces):
             ip_addresses, public_ip = self._get_ip_addresses(network)
             nic_data = {
@@ -30,7 +30,7 @@ class NICManager(BaseManager):
                 'ip_addresses': ip_addresses,
                 'device': '',
                 'nic_type': 'Virtual',
-                'cidr': subnet_vo.get('subnet_vo'),
+                'cidr': subnet_vo.get('cidr', ''),
                 'public_ip_address': public_ip,
                 'tags': {}
             }

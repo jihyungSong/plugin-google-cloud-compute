@@ -5,7 +5,7 @@ from spaceone.inventory.model.metadata.metadata_dynamic_layout import ItemDynami
 from spaceone.inventory.model.metadata.metadata_dynamic_field import TextDyField, EnumDyField, ListDyField, \
     DateTimeDyField
 
-ec2_instance = ItemDynamicLayout.set_fields('EC2 Instance', fields=[
+ec2_instance = ItemDynamicLayout.set_fields('GCP Instance', fields=[
     TextDyField.data_source('Instance ID', 'data.compute.instance_id'),
     EnumDyField.data_source('Instance State', 'data.compute.instance_state', default_state={
         'safe': ['running'],
@@ -38,20 +38,20 @@ ec2_instance = ItemDynamicLayout.set_fields('EC2 Instance', fields=[
     DateTimeDyField.data_source('Launched At', 'data.compute.launched_at'),
 ])
 
-ec2_vpc = ItemDynamicLayout.set_fields('VPC', fields=[
+gcp_vpc = ItemDynamicLayout.set_fields('VPC', fields=[
     TextDyField.data_source('VPC ID', 'data.vpc.vpc_id'),
     TextDyField.data_source('VPC Name', 'data.vpc.vpc_name'),
     TextDyField.data_source('Subnet ID', 'data.subnet.subnet_id'),
     TextDyField.data_source('Subnet Name', 'data.subnet.subnet_name'),
 ])
 
-ec2_asg = ItemDynamicLayout.set_fields('Auto Scaling Group', fields=[
+gcp_asg = ItemDynamicLayout.set_fields('Auto Scaling Group', fields=[
     TextDyField.data_source('Auto Scaling Group', 'data.auto_scaling_group.name'),
     TextDyField.data_source('Launch Configuration', 'data.auto_scaling_group.launch_configuration.name'),
     TextDyField.data_source('Launch Template', 'data.auto_scaling_group.launch_template.name'),
 ])
 
-ec2 = ListDynamicLayout.set_layouts('AWS EC2', layouts=[ec2_instance, ec2_vpc, ec2_asg])
+gcp = ListDynamicLayout.set_layouts('AWS EC2', layouts=[ec2_instance, gcp_vpc, gcp_asg])
 
 disk = TableDynamicLayout.set_fields('Disk', root_path='disks', fields=[
     TextDyField.data_source('Index', 'device_index'),
@@ -74,7 +74,7 @@ nic = TableDynamicLayout.set_fields('NIC', root_path='nics', fields=[
     TextDyField.data_source('Public DNS', 'tags.public_dns'),
 ])
 
-security_group = TableDynamicLayout.set_fields('Security Groups', root_path='data.security_group_rules', fields=[
+security_group = TableDynamicLayout.set_fields('Security Groups', root_path='data.security_group', fields=[
     EnumDyField.data_source('Direction', 'direction', default_badge={
         'indigo.500': ['inbound'], 'coral.600': ['outbound']
     }),
@@ -103,7 +103,7 @@ tags = TableDynamicLayout.set_fields('AWS Tags', root_path='data.aws.tags', fiel
     TextDyField.data_source('Value', 'Value'),
 ])
 
-metadata = ServerMetadata.set_layouts([ec2, tags, disk, nic, security_group, elb])
+metadata = ServerMetadata.set_layouts([gcp, tags, disk, nic, security_group, elb])
 
 
 class MetadataManager(BaseManager):

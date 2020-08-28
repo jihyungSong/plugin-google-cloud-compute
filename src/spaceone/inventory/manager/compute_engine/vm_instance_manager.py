@@ -4,6 +4,8 @@ from spaceone.inventory.model.google_cloud import GoogleCloud
 from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
 
+
+
 class VMInstanceManager(BaseManager):
 
     def __init__(self):
@@ -96,7 +98,8 @@ class VMInstanceManager(BaseManager):
         return server_data
 
     def get_os_type_and_data(self, instance):
-        os_dists = instance.get("licenses", [])         # TODO: TBD
+        disk_info = instance.get("disks", [])
+        os_dists = disk_info[0].get('licenses', []) if len(disk_info) > 0 else []
         os_type = "LINUX"
         os_identity = ''
 
@@ -126,6 +129,7 @@ class VMInstanceManager(BaseManager):
             "scheduling": self.get_scheduling(instance),
             "labels": instance.get('labels', {})
         }
+
         return GoogleCloud(google_cloud, strict=False)
 
     def get_hardware_data(self, instance, instance_types):
