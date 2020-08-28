@@ -293,18 +293,12 @@ class CollectorManager(BaseManager):
             'us-west4': {'name': 'Las Vegas, Nevada, USA'},
         }
 
-        print('-----result_data------')
-        print()
-        pprint(result)
-        print(result.get('region_code'))
-        print('----------------------')
-
-        match_region_info = REGION_INFO.get(result.region_code)
+        match_region_info = REGION_INFO.get(result.get('region_code'))
 
         if match_region_info is not None:
             region_info = match_region_info.copy()
             region_info.update({
-                'region_code': result.region_code
+                'region_code': result.get('region_code')
             })
 
             return Region(region_info, strict=False)
