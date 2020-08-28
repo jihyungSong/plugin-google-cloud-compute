@@ -1,7 +1,5 @@
 import time
 import logging
-import concurrent.futures
-from pprint import pprint
 from spaceone.core.service import *
 from spaceone.inventory.manager.collector_manager import CollectorManager
 

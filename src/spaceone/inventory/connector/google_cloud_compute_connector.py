@@ -2,15 +2,10 @@ __all__ = ["GoogleCloudComputeConnector"]
 
 import logging
 import os
-import itertools
-import re
 import google.oauth2.service_account
 import googleapiclient
 import googleapiclient.discovery
-from pprint import pprint
 from spaceone.core.connector import BaseConnector
-from spaceone.core.utils import deep_merge
-from collections import defaultdict
 
 _LOGGER = logging.getLogger(__name__)
 INSTANCE_TYPE_FILE = '%s/conf/%s' % (os.path.dirname(os.path.abspath(__file__)), 'instances.json')

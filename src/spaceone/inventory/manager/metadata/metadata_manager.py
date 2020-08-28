@@ -27,7 +27,7 @@ gcp_instance = ItemDynamicLayout.set_fields('GCP Instance', fields=[
     TextDyField.data_source('Public IP', 'data.public_ip_address'),
     ListDyField.data_source('IP Addresses', 'data.ip_addresses',
                             default_badge={'type': 'outline', 'delimiter': '<br>'}),
-    ListDyField.data_source('Security Groups', 'data.compute.sg_group_names',
+    ListDyField.data_source('Affected Rules', 'data.compute.sg_group_names',
                             default_badge={'type': 'outline', 'delimiter': '<br>'}),
 
     DateTimeDyField.data_source('Launched At', 'data.compute.launched_at'),

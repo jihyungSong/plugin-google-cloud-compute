@@ -2,7 +2,6 @@ __all__ = ['CollectorManager']
 
 import time
 import logging
-from pprint import pprint
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \

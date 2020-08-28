@@ -1,7 +1,7 @@
 from itertools import product
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.security_group import SecurityGroup
-from pprint import pprint
+
 
 class SecurityGroupManager(BaseManager):
 
@@ -80,7 +80,7 @@ class SecurityGroupManager(BaseManager):
                     'security_group_id': firewall.get('id', ''),
                     'remote': remote_cidr if remote_cidr != '' else remote_id
                 })
-                pprint(sg_single)
+
                 sg_rules.append(SecurityGroup(sg_single, strict=False))
 
     def get_allowed_or_denied_info(self, firewall):
