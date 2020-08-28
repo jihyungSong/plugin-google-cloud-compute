@@ -99,26 +99,23 @@ class CollectorManager(BaseManager):
 
         server_data = vm_instance_manager.get_server_info(instance, instance_types, disks, zone_info)
         auto_scaler_vo = auto_scaler_manager.get_auto_scaler_info(instance, instance_group, auto_scaler)
-
         load_balancer_vos = lb_manager.get_load_balancer_info(instance, instance_group, backend_svcs, url_maps, target_pools, forwarding_rules)
-
         disk_vos = disk_manager.get_disk_info(instance, disks)
-
         vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
-
-
         nic_vos = nic_manager.get_nic_info(instance, subnet_vo)
-
-        sg_rules_vos = security_group_manager.get_security_group_rules_info(instance, firewalls)
-        pprint(sg_rules_vos)
+        sg_groups_vos = security_group_manager.get_security_group_rules_info(instance, firewalls)
+        sg_group_names = [d.get('security_group_name') for d in sg_groups_vos if d.get('security_group_name', '') != '']
+        
         server_data.update({
             'nics': nic_vos,
             'disks': disk_vos,
         })
 
+        server_data['data']['compute']['sg_group_names'] = sg_group_names
+
         server_data['data'].update({
             'load_balancers': load_balancer_vos,
-            'security_group': sg_rules_vos,
+            'security_group': sg_groups_vos,
             'auto_scaler_group': auto_scaler_vo,
             'vpc': vpc_vo,
             'subnet': subnet_vo,

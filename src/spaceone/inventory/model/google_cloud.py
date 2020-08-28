@@ -1,10 +1,10 @@
 from schematics import Model
-from schematics.types import ModelType, StringType, BooleanType, ListType, DictType
+from schematics.types import ModelType, StringType, BooleanType, ListType
 
 
-# class (Model):
-#     key = StringType()
-#     value = StringType()
+class Labels(Model):
+    key = StringType()
+    value = StringType()
 
 
 class Scheduling(Model):
@@ -19,4 +19,4 @@ class GoogleCloud(Model):
     reservation_affinity = StringType(default="ANY_RESERVATION")
     deletion_protection = BooleanType(default=False)
     scheduling = ModelType(Scheduling)
-    labels = DictType(StringType, default={}, serialize_when_none=False)
+    labels = ListType(ModelType(Labels), default=[], serialize_when_none=False)

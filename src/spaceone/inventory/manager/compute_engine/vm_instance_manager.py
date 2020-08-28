@@ -5,7 +5,6 @@ from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
 
 
-
 class VMInstanceManager(BaseManager):
 
     def __init__(self):
@@ -127,7 +126,7 @@ class VMInstanceManager(BaseManager):
             "reservation_affinity": self.get_reservation_affinity(instance),
             "deletion_protection": instance.get('deletionProtection', False),
             "scheduling": self.get_scheduling(instance),
-            "labels": instance.get('labels', {})
+            "labels": self.get_labels(instance)
         }
 
         return GoogleCloud(google_cloud, strict=False)

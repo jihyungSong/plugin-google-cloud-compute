@@ -45,7 +45,7 @@ class DiskManager(BaseManager):
                     'write_iops': self.get_iops_rate(single_disk_type, disk_sz, 'write'),
                     'read_throughput': self.get_throughput_rate(single_disk_type, disk_sz),
                     'write_throughput': self.get_throughput_rate(single_disk_type, disk_sz),
-                    'labels': matching_single_disk_tag.get('labels', {})
+                    'labels': self._get_labels(matching_single_disk_tag)
                 })
 
             single_disk = {
@@ -115,7 +115,7 @@ class DiskManager(BaseManager):
         return type_split[-1]
 
     @staticmethod
-    def get_labels(instance):
+    def _get_labels(instance):
         labels = []
         for k, v in instance.get('labels', {}).items():
             labels.append({

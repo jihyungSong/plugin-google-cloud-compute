@@ -1,5 +1,5 @@
 from schematics import Model
-from schematics.types import  StringType, DateTimeType, DictType
+from schematics.types import ListType, StringType, DateTimeType, DictType
 
 
 class Compute(Model):
@@ -12,4 +12,5 @@ class Compute(Model):
     account = StringType()                  # Project_id
     image = StringType()
     launched_at = DateTimeType()
+    sg_group_names = ListType(StringType, default=[])
     tags = DictType(StringType, default={})
