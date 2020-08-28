@@ -1,23 +1,12 @@
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.load_balancer import LoadBalancer
-from spaceone.inventory.connector.google_cloud_compute_connector import GoogleCloudComputeConnector
 
 
 class LoadBalancerManager(BaseManager):
-
-    def __init__(self, params, vm_connector=None):
-        self.params = params
-        self.vm_connector: GoogleCloudComputeConnector = vm_connector
+    def __init__(self):
+        pass
 
     def get_load_balancer_info(self, instance, instance_groups, backend_svc, url_maps, target_pools, forwarding_rules):
-
-        # type = StringType(choices=('HTTP', 'TCP', 'UDP'))
-        # name = StringType()
-        # dns = StringType(default="")
-        # port = ListType(IntType())
-        # protocol = ListType(StringType())
-        # scheme = StringType(choices=('EXTERNAL', 'INTERNAL'))
-        # tags = DictType(StringType, default={})
         '''
         load_balancer_data_list = [{
                 "type": 'HTTP'| 'TCP'| 'UDP'
@@ -36,8 +25,8 @@ class LoadBalancerManager(BaseManager):
         ]
         '''
         load_balancer_data_list = []
-        matched_group = self.get_matched_instance_group(instance, instance_groups)
-        if matched_group is not None:
+        matched_groups = self.get_matched_instance_group(instance, instance_groups)
+        for matched_group in matched_groups:
             matched_http_backend_svcs = self.get_matched_backend_svc_for_http(matched_group, backend_svc, url_maps)
             matched_lb_infos = matched_http_backend_svcs
             for matched_lb_info in matched_lb_infos:
@@ -53,12 +42,13 @@ class LoadBalancerManager(BaseManager):
                     'tags': {}
                 }
                 load_balancer_data_list.append(LoadBalancer(lb_data, strict=False))
+
         matched_target_pools = self._get_matched_target_pool(instance, target_pools)
 
         if len(matched_target_pools) > 0:
             lbs_by_fd_rules = self._get_matched_forwarding_rules(matched_target_pools, forwarding_rules)
             for lbs_by_fd_rule in lbs_by_fd_rules:
-                lb_info = matched_lb_info.get('lb_info', {})
+                lb_info = lbs_by_fd_rule.get('lb_info', {})
                 protocol = lbs_by_fd_rule.get('IPProtocol', '')
                 lb_data = {
                     'type': protocol,
@@ -93,18 +83,14 @@ class LoadBalancerManager(BaseManager):
         return matched_backend_svc
 
     def get_matched_instance_group(self, instance, instance_groups):
-        matched_instance_group = None
+        matched_instance_group = []
         for instance_group in instance_groups:
-            find = False
             instance_list = instance_group.get('instance_list', [])
             for single_inst in instance_list:
-                instance_name = self._get_key_name('instance', single_inst)
-                if instance.get('name') == instance_name:
-                    matched_instance_group = instance_group
-                    find = True
+                if instance.get('selfLink', '') == single_inst.get('instance'):
+                    matched_instance_group.append(instance_group)
                     break
-            if find:
-                break
+
         return matched_instance_group
 
     @staticmethod

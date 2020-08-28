@@ -2,11 +2,11 @@ __all__ = ['CollectorManager']
 
 import time
 import logging
-import concurrent.futures
+from pprint import pprint
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
-    DiskManager, NICManager, VPCManager
+    DiskManager, NICManager, VPCManager, SecurityGroupManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
 from spaceone.inventory.model.server import Server
 from spaceone.inventory.model.region import Region
@@ -58,6 +58,15 @@ class CollectorManager(BaseManager):
     def get_instance(self, zone_info, instance, global_resources):
         zone = zone_info['zone']
 
+        # 'images': images,
+        # 'vpcs': vpcs,
+        # 'subnets': subnets,
+        # 'fire_walls': fire_walls,
+        # 'forwarding_rules': forwarding_rules,
+        # 'target_pools': target_pools,
+        # 'url_maps': url_maps,
+        # 'backend_svcs': backend_svcs
+
         # Images
         images = global_resources.get('images', [])
 
@@ -66,134 +75,74 @@ class CollectorManager(BaseManager):
         subnets = global_resources.get('subnets', [])
 
         # URL Maps
-        load_balancers = global_resources.get('url_maps', [])
-
+        url_maps = global_resources.get('url_maps', [])
+        backend_svcs = global_resources.get('backend_svcs', [])
+        target_pools = global_resources.get('target_pools', [])
         # Forwarding Rules
         forwarding_rules = global_resources.get('forwarding_rules', [])
 
         # Security Group (Firewall)
-        security_groups = global_resources.get('firewalls', [])
+        firewalls = global_resources.get('firewalls', [])
 
-        # Instance Group Managers
-        instance_group_managers = global_resources.get('instance_group_managers', [])
+        # Get Instance Groups
+        instance_group = self.gcp_connector.list_instance_group_managers(zone=zone)
+        self.gcp_connector.set_instance_into_instance_group_managers(instance_group, zone=zone)
 
-        # Machine Types
-        machine_types = global_resources.get('machine_types', [])
+        # Get Machine Types
+        instance_types = self.gcp_connector.list_machine_types(zone=zone)
 
-        # Auto Scalers
-        auto_scalers = global_resources.get('auto_scalers', [])
+        # Autoscaling group list
+        auto_scaler = self.gcp_connector.list_auto_scalers(zone=zone)
 
-        # Disks
-        disks = global_resources.get('disks', [])
+        # disks
+        disks = self.gcp_connector.list_disk(zone=zone)
+        disk_types = self.gcp_connector.list_disk_types(zone=zone)
 
-        # Disk Types
-        disk_types = global_resources.get('disk_types', [])
+        # call_up all the managers
+        vm_instance_manager: VMInstanceManager = VMInstanceManager()
+        auto_scaler_manager: AutoScalerManager = AutoScalerManager()
+        lb_manager: LoadBalancerManager = LoadBalancerManager()
+        disk_manager: DiskManager = DiskManager()
+        nic_manager: NICManager = NICManager()
+        vpc_manager: VPCManager = VPCManager()
+        security_group_manager: SecurityGroupManager = SecurityGroupManager()
+        meta_manager: MetadataManager = MetadataManager()
 
-        # TODO: 여기에 구현
+        server_data = vm_instance_manager.get_server_info(instance, instance_types, disks, zone_info)
+        auto_scaler_vo = auto_scaler_manager.get_auto_scaler_info(instance, instance_group, auto_scaler)
+        load_balancer_vos = lb_manager.get_load_balancer_info(instance, instance_group, backend_svcs, url_maps, target_pools, forwarding_rules)
+        disk_vos = disk_manager.get_disk_info(instance, disks)
+        vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
+        nic_vos = nic_manager.get_nic_info(instance, subnet_vo)
+        sg_rules_vos = security_group_manager.get_security_group_rules_info(instance, firewalls)
 
+        server_data.update({
+            'nics': nic_vos,
+            'disks': disk_vos,
+        })
 
-        return ''
+        server_data['data'].update({
+            'load_balancers': load_balancer_vos,
+            'security_group': sg_rules_vos,
+            'auto_scaler_group': auto_scaler_vo,
+            'vpc': vpc_vo,
+            'subnet': subnet_vo,
+        })
+        server_data.update({
+            '_metadata': meta_manager.get_metadata(),
+        })
 
-    def list_instances(self, params):
-        connector = params['connector']
+        # print('-----Server_data------')
+        # print()
+        # pprint(server_data)
+        # print()
+        # print('----------------------')
 
-        server_vos = []
-        instance_filter = {'zone': params['zone_info']['zone']}
-
-        if len(params.get('instance_ids', [])) > 0:
-            instance_filter.update({'filter': [{'key': 'id', 'values': params['instance_ids']}]})
-
-        instances = connector.list_instances(**instance_filter)
-
-        if len(instances) > 0:
-            resources = params['resources']
-
-            # Images
-            images = resources.get('images', [])
-
-            # VPC
-            vpcs = resources.get('vpcs', [])
-            subnets = resources.get('subnets', [])
-
-            # URL Maps
-            load_balancers = resources.get('url_maps', [])
-
-            # Forwarding Rules
-            forwarding_rules = resources.get('forwarding_rules', [])
-
-            # Security Group (Firewall)
-            security_groups = resources.get('firewalls', [])
-
-            # Get Instance Groups
-            instance_group = connector.list_instance_group_managers()
-
-            # Get Machine Types
-            instance_types = connector.list_machine_types()
-
-            # Autoscaling group list
-            auto_scaler = connector.list_auto_scalers()
-
-            # disks
-            disks = connector.list_disk()
-            disk_types = connector.list_disk_types()
-
-            # call_up all the managers
-            vm_instance_manager: VMInstanceManager = VMInstanceManager(params)
-            auto_scaler_manager: AutoScalerManager = AutoScalerManager(params)
-            lb_manager: LoadBalancerManager = LoadBalancerManager(params)
-            disk_manager: DiskManager = DiskManager(params)
-            nic_manager: NICManager = NICManager(params)
-            vpc_manager: VPCManager = VPCManager(params)
-            security_group_manager: SecurityGroupRuleManager = SecurityGroupRuleManager(params)
-            meta_manager: MetadataManager = MetadataManager()
-
-            for instance in instances:
-                server_data = vm_instance_manager.get_server_info(instance, instance_types, disks)
-                auto_scaler_vo = auto_scaler_manager.get_auto_scaler_info(instance, instance_group, auto_scaler)
-
-                # load_balancer_vos = elb_manager.get_load_balancing_info(load_balancers, target_groups,
-                #                                                        instance_id, instance_ip)
-
-                disk_vos = disk_manager.get_disk_info(instance, disks)
-                vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
-                nic_vos = nic_manager.get_nic_info(instance, subnet_vo)
-
-                # sg_ids = [security_group.get('GroupId') for security_group in instance.get('SecurityGroups', []) if
-                #           security_group.get('GroupId') is not None]
-                # sg_rules_vos = sg_manager.get_security_group_rules_info(sg_ids, sgs)
-
-                server_data.update({
-                    'nics': nic_vos,
-                    'disks': disk_vos,
-                })
-
-                server_data['data'].update({
-                    'load_balancers': load_balancer_vos,
-                    'security_group_rules': sg_rules_vos,
-                    'auto_scaler_group': auto_scaler_vo,
-                    'vpc': vpc_vo,
-                    'subnet': subnet_vo,
-                })
-
-                # IP addr : ip_addresses = data.compute.eip + nics.ip_addresses + data.public_ip_address
-                server_data.update({
-                    'ip_addresses': self.merge_ip_addresses(server_data)
-                })
-
-                server_data['data']['compute']['account'] = project_id
-
-                server_data.update({
-                    '_metadata': meta_manager.get_metadata(),
-                })
-
-                server_vos.append(Server(server_data, strict=False))
-
-        return server_vos
+        return server_data
 
     def list_resources(self, params):
         '''
         params = {
-            # 'connector': GoogleCloudComputeConnector,
             'zone_info': {
                'region': 'us-east-1,
                'zone': 'us-east-1a'
@@ -217,17 +166,13 @@ class CollectorManager(BaseManager):
         start_time = time.time()
 
         # try:
-        zone_info = params['zone_info']
+        secret_data = params.get('secret_data', {})
+
+        zone_info = params.get('zone_info')
+        self._set_project_id_to_zone_info(zone_info, secret_data.get('project_id', ''))
+
         instances = params.get('instances', [])
         global_resources = params['resources']
-
-        global_resources.update({
-            'instance_group_managers': self.gcp_connector.list_instance_group_managers(zone=zone_info['zone']),
-            'machine_types': self.gcp_connector.list_machine_types(zone=zone_info['zone']),
-            'auto_scalers': self.gcp_connector.list_auto_scalers(zone=zone_info['zone']),
-            'disks': self.gcp_connector.list_disk(zone=zone_info['zone']),
-            'disk_types': self.gcp_connector.list_disk_types(zone=zone_info['zone'])
-        })
 
         resources = [self.get_instance(zone_info, instance, global_resources) for instance in instances]
         print(f'   [{params["zone_info"]["zone"]}] Finished {time.time() - start_time} Seconds')
@@ -238,78 +183,52 @@ class CollectorManager(BaseManager):
         #     return []
 
     def list_subnets(self, params):
-        '''
-        params = {
-            'region': 'GOOGLE_REGION',
-            'connector': GoogleCloudComputeConnector
-        }
-        '''
-        # print(f"[START] LIST Subnet {params['region']}")
-        # connector: GoogleCloudComputeConnector = params['connector']
-        # subnets = connector.list_subnets(region=params['region'])
-        # print(f"[END] {params['region']}")
+        print(f"[START] LIST Subnet {params['region']}")
         return self.gcp_connector.list_subnets(region=params['region'])
-        # return subnets
 
     def list_forwarding_rules(self, params):
-
-        '''
-        params = {
-            'region': 'GOOGLE_REGION',
-            'connector': GoogleCloudComputeConnector
-        }
-        '''
-        # print(f"LIST Forwarding Rules START.. {params['region']}")
-        # connector: GoogleCloudComputeConnector = params['connector']
-        # frules = connector.list_forwarding_rules(region=params['region'])
-        # print(f"[END] {params['region']}")
+        print(f"LIST Forwarding Rules START.. {params['region']}")
         return self.gcp_connector.list_forwarding_rules(region=params['region'])
-        # return frules
 
-    def get_volume_ids(self, instance):
-        block_device_mappings = instance.get('BlockDeviceMappings', [])
-        return [block_device_mapping['Ebs']['VolumeId'] for block_device_mapping in block_device_mappings if block_device_mapping.get('Ebs') is not None]
+    def list_target_pools(self, params):
+        return self.gcp_connector.list_target_pools(region=params['region'])
 
-    def get_image_ids(self, instances):
-        return [instance.get('ImageId') for instance in instances if instance.get('ImageId') is not None]
+    def list_region_url_maps(self, params):
+        return self.gcp_connector.list_region_url_maps(region=params['region'])
 
-    def merge_ip_addresses(self, server_data):
-        compute_data = server_data['data']['compute']
-        nics = server_data['nics']
-
-        nic_ip_addresses = []
-        for nic in nics:
-            nic_ip_addresses.extend(nic.ip_addresses)
-
-        merge_ip_address = compute_data.eip + nic_ip_addresses
-
-        if server_data['data']['public_ip_address'] != '':
-            merge_ip_address.append(server_data['data']['public_ip_address'])
-
-        return list(set(merge_ip_address))
+    def list_region_backend_svcs(self, params):
+        return self.gcp_connector.list_region_backend_svcs(region=params['region'])
 
     def get_global_resources(self, secret_data, regions):
         print("[ GET zone independent resources ]")
         if self.gcp_connector is None:
             self.set_connector(secret_data)
 
+        # Global sources within project_id
         url_maps = self.gcp_connector.list_url_maps()
         images = self.gcp_connector.list_images()
         vpcs = self.gcp_connector.list_vpcs()
         fire_walls = self.gcp_connector.list_firewalls()
+        backend_svcs = self.gcp_connector.list_backend_svcs()
+
+        # Regional Sources with region parameter
         subnets = []
         forwarding_rules = []
+        target_pools = []
 
         for region_param in self.generate_region_params(regions):
             subnets.extend(self.list_subnets(region_param))
             forwarding_rules.extend(self.list_forwarding_rules(region_param))
+            target_pools.extend(self.list_target_pools(region_param))
+            url_maps.extend(self.list_region_url_maps(region_param))
+            backend_svcs.extend(self.list_region_backend_svcs(region_param))
 
         # Generate Thread Pool for collecting Subnets
         # with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
         #     future_executors = []
         #     for mt_param in mt_params:
         #         future_executors.append(executor.submit(self.list_subnets, mt_param))
-        # 
+        #
         #     for future in concurrent.futures.as_completed(future_executors):
         #         for result in future.result():
         #             subnets.append(result)
@@ -319,7 +238,7 @@ class CollectorManager(BaseManager):
         #     future_executors = []
         #     for mt_param in mt_params:
         #         future_executors.append(executor.submit(self.list_forwarding_rules, mt_param))
-        # 
+        #
         #     for future in concurrent.futures.as_completed(future_executors):
         #         for result in future.result():
         #             forwarding_rules.append(result)
@@ -327,37 +246,23 @@ class CollectorManager(BaseManager):
         print("====== END of zone independent resources")
 
         return {
-            'url_maps': url_maps,
             'images': images,
             'vpcs': vpcs,
-            'fire_walls': fire_walls,
             'subnets': subnets,
-            'forwarding_rules': forwarding_rules
+            'fire_walls': fire_walls,
+            'forwarding_rules': forwarding_rules,
+            'target_pools': target_pools,
+            'url_maps': url_maps,
+            'backend_svcs': backend_svcs
         }
 
     def generate_region_params(self, regions):
         return list(map(lambda region: {'region': region['name']}, regions))
-        
-        # params = []
-
-        # for region in regions:
-        #     _conn = self.locator.get_connector('GoogleCloudComputeConnector')
-        #     _conn.get_connect(secret_data)
-        # 
-        #     params.append({
-        #         'region': region['name'],
-        #         'connector': _conn
-        #     })
-        # 
-        # return params
 
     @staticmethod
-    def _get_simplified_vo(vm_connector):
-        return {
-            'project_id': vm_connector.get('project_id', ''),
-            'region': vm_connector.get('region', ''),
-            'zone': vm_connector.get('zone', '')
-        }
+    def _set_project_id_to_zone_info(zone_info, project_id):
+        if project_id != '':
+            zone_info.update({'project_id': project_id})
 
     @staticmethod
     def get_region_from_result(result):
@@ -387,6 +292,12 @@ class CollectorManager(BaseManager):
             'us-west3': {'name': 'Salt Lake City, Utah, USA'},
             'us-west4': {'name': 'Las Vegas, Nevada, USA'},
         }
+
+        print('-----result_data------')
+        print()
+        pprint(result)
+        print(result.get('region_code'))
+        print('----------------------')
 
         match_region_info = REGION_INFO.get(result.region_code)
 

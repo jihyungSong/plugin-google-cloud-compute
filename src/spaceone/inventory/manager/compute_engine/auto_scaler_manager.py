@@ -2,8 +2,8 @@ from spaceone.core.manager import BaseManager
 from spaceone.inventory.model.auto_scaler import AutoScaler
 
 class AutoScalerManager(BaseManager):
-    def __init__(self, params):
-        self.params = params
+    def __init__(self):
+        pass
 
     def get_auto_scaler_info(self, instance, instance_group_managers, auto_scalers):
         '''

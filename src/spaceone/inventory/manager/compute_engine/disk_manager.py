@@ -3,8 +3,8 @@ from spaceone.inventory.model.disk import Disk
 
 
 class DiskManager(BaseManager):
-    def __init__(self, params):
-        self.params = params
+    def __init__(self):
+        pass
 
     def get_disk_info(self, instance, disk_list):
         '''

@@ -5,8 +5,8 @@ from spaceone.inventory.model.security_group import SecurityGroup
 
 class SecurityGroupManager(BaseManager):
 
-    def __init__(self, params):
-        self.params = params
+    def __init__(self):
+        pass
 
     def get_security_group_rules_info(self, instance, firewalls):
         '''

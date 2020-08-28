@@ -212,13 +212,15 @@ from schematics.types import StringType, ModelType, DateTimeType
   "selfLink": "https://www.googleapis.com/compute/beta/projects/bluese-cloudone-20200113/zones/asia-northeast3-a/instanceGroupManagers",
   "kind": "compute#instanceGroupManagerList"
 }
-
 '''
+
+
 class InstanceGroup(Model):
     id = StringType()
     self_link = StringType()
     name = StringType()
     instance_template_name = StringType()
+
 
 class AutoScaler(Model):
     id = StringType()

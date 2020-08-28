@@ -4,8 +4,9 @@ from spaceone.inventory.model.subnet import Subnet
 
 
 class VPCManager(BaseManager):
-    def __init__(self, params):
-        self.params = params
+
+    def __init__(self):
+        pass
 
     def get_vpc_info(self, instance, vpcs, subnets):
         '''

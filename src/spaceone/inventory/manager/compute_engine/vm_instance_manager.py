@@ -4,12 +4,12 @@ from spaceone.inventory.model.google_cloud import GoogleCloud
 from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
 
-
 class VMInstanceManager(BaseManager):
-    def __init__(self, params):
-        self.params = params
 
-    def get_server_info(self, instance, instance_types, disks):
+    def __init__(self):
+        pass
+
+    def get_server_info(self, instance, instance_types, disks, zone_info):
         '''
         server_data = {
             "name": '',
@@ -65,10 +65,10 @@ class VMInstanceManager(BaseManager):
         '''
 
         os_type, os_data = self.get_os_type_and_data(instance)
-        server_dic = self.get_server_dic(instance, os_type, current_vo)
+        server_dic = self.get_server_dic(instance, os_type, zone_info)
         google_cloud_data = self.get_google_cloud_data(instance)
         hardware_data = self.get_hardware_data(instance, instance_types)
-        compute_data = self.get_compute_data(instance, disks, current_vo)
+        compute_data = self.get_compute_data(instance, disks, zone_info)
 
         server_dic.update({
             'data': {
@@ -81,7 +81,7 @@ class VMInstanceManager(BaseManager):
 
         return server_dic
 
-    def get_server_dic(self, instance, os_type, current_vo):
+    def get_server_dic(self, instance, os_type, zone_info):
         server_data = {
             'name': instance.get('name', ''),
             'server_type': 'VM',
@@ -89,7 +89,7 @@ class VMInstanceManager(BaseManager):
             'provider': 'google_cloud',
             'primary_ip_address': self._get_primary_ip_address(instance),
             'ip_addresses': self._get_ip_addresses(instance),
-            'region_code': current_vo.get('region', ''),
+            'region_code': zone_info.get('region', ''),
             'region_type': 'GOOGLE_CLOUD'
         }
 
@@ -124,9 +124,8 @@ class VMInstanceManager(BaseManager):
             "reservation_affinity": self.get_reservation_affinity(instance),
             "deletion_protection": instance.get('deletionProtection', False),
             "scheduling": self.get_scheduling(instance),
-            "labels": instance.get('labels', {}) #self.get_labels(instance)
-        },
-
+            "labels": instance.get('labels', {})
+        }
         return GoogleCloud(google_cloud, strict=False)
 
     def get_hardware_data(self, instance, instance_types):
@@ -144,9 +143,10 @@ class VMInstanceManager(BaseManager):
             'cpu_model': instance.get('cpuPlatform', ''),
             'is_vm': True
         }
+
         return Hardware(hardware_data, strict=False)
 
-    def get_compute_data(self, instance, disks, current_vo):
+    def get_compute_data(self, instance, disks, zone_info):
         '''
             {
                 'keypair': StringType(default="")
@@ -164,16 +164,17 @@ class VMInstanceManager(BaseManager):
 
         compute_data = {
             'keypair': '',
-            'az': current_vo.get('zone', ''),            # zone_name
+            'az': zone_info.get('zone', ''),            # zone_name
             'instance_id': instance.get('id'),
             'instance_name': instance.get('name', ''),
             'instance_state': instance.get('status'),
             'instance_type': self._get_instance_type(instance),
-            'account': current_vo.get('project_id', ''),
-            'image': self._get_image(instance, disks),
+            'account': zone_info.get('project_id', ''),
+            'image': self._get_images(instance, disks),
             'launched_at': instance.get('creationTimestamp'),
-            'tags': self._get_tags_only_string_values(instance) # TODO: Dict or String in Model 처리 필요
+            'tags': self._get_tags_only_string_values(instance)
         }
+
         return Compute(compute_data)
 
     @staticmethod
@@ -187,7 +188,8 @@ class VMInstanceManager(BaseManager):
     @staticmethod
     def _get_images(instance, disks):
         image = ''
-        name = instance.get('name')
+        name = instance.get('name', '')
+
         for disk in disks:
             if name == disk.get('name', ''):
                 image = disk.get('sourceImage', '')

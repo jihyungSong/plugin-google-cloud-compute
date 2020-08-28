@@ -75,6 +75,13 @@ class GoogleCloudComputeConnector(BaseConnector):
         url_map = response.get('items', [])
         return url_map
 
+    def list_backend_svcs(self, **query):
+        query = self.generate_query(**query)
+        response = self.client.backendServices().list(**query).execute()
+        url_map = response.get('items', [])
+        return url_map
+
+
     def list_disk(self, **query):
         query = self.generate_query(**query)
         response = self.client.disks().list(**query).execute()
@@ -111,11 +118,15 @@ class GoogleCloudComputeConnector(BaseConnector):
         firewall = response.get('items', [])
         return firewall
 
-    def list_instance_from_instance_groups(self, **query):
+    def list_instance_from_instance_groups(self, instance_group_name, zone, **query):
         query = self.generate_query(**query)
+        query.update({
+            'instanceGroup': instance_group_name,
+            'zone': zone
+        })
         response = self.client.instanceGroups().listInstances(**query).execute()
-        firewall = response.get('items', [])
-        return firewall
+        instance_list = response.get('items', [])
+        return instance_list
 
     def list_instance_group_managers(self, **query):
         query = self.generate_query(**query)
@@ -133,15 +144,30 @@ class GoogleCloudComputeConnector(BaseConnector):
         response = self.client.subnetworks().list(**query).execute()
         return response.get('items', [])
 
+    def list_region_url_maps(self, **query):
+        query = self.generate_query(**query)
+        response = self.client.regionUrlMaps().list(**query).execute()
+        return response.get('items', [])
+
+    def list_region_backend_svcs(self, **query):
+        query = self.generate_query(**query)
+        response = self.client.regionBackendServices().list(**query).execute()
+        return response.get('items', [])
+
+    def list_target_pools(self, **query):
+        query = self.generate_query(**query)
+        response = self.client.targetPools().list(**query).execute()
+        return response.get('items', [])
+
     def list_forwarding_rules(self, **query):
         query = self.generate_query(**query)
         response = self.client.forwardingRules().list(**query).execute()
         return response.get('items', [])
 
-    def set_instance_into_instance_group_managers(self, instance_group_managers):
+    def set_instance_into_instance_group_managers(self, instance_group_managers, zone):
         for instance_group in instance_group_managers:
             instance_group_name = instance_group.get('baseInstanceName', '')
-            inst_list = self.list_instance_from_instance_groups(instance_group_name)
+            inst_list = self.list_instance_from_instance_groups(instance_group_name, zone)
             instance_group.update({
                 'instance_list': inst_list
             })
