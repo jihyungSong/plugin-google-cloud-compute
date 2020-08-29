@@ -111,7 +111,6 @@ class CollectorManager(BaseManager):
         })
 
         server_data['data']['compute']['sg_group_names'] = sg_group_names
-        print(auto_scaler_vo)
         server_data['data'].update({
             'load_balancers': load_balancer_vos,
             'security_group': sg_groups_vos,
