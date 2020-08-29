@@ -17,7 +17,7 @@ class ServerData(Model):
     hardware = ModelType(Hardware)
     compute = ModelType(Compute)
     load_balancers = ListType(ModelType(LoadBalancer))
-    security_group_rules = ListType(ModelType(SecurityGroup))
+    security_group = ListType(ModelType(SecurityGroup))
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
     auto_scaler = ModelType(AutoScaler, serialize_when_none=False)
