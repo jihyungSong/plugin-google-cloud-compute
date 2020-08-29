@@ -83,7 +83,7 @@ class CollectorManager(BaseManager):
 
         # disks
         disks = self.gcp_connector.list_disk(zone=zone)
-        # if distro has additonary
+        # TODO: if distro has additional requirement with os_distros for future
         # disk_types = self.gcp_connector.list_disk_types(zone=zone)
 
         # call_up all the managers
