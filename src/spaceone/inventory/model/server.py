@@ -20,7 +20,7 @@ class ServerData(Model):
     security_group = ListType(ModelType(SecurityGroup))
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
-    auto_scaler = ModelType(AutoScaler, serialize_when_none=False)
+    auto_scalers = ModelType(AutoScaler, serialize_when_none=False)
 
 
 class Server(Model):
