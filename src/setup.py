@@ -16,14 +16,14 @@
 
 from setuptools import setup, find_packages
 
-with open('VERSION', 'r') as f: 
+with open('VERSION', 'r') as f:
     VERSION = f.read().strip()
     f.close()
 
 setup(
     name='plugin-googlecloud-compute',
     version=VERSION,
-    description='GCP compute inventory collector',
+    description='GCP VM instance inventory collector',
     long_description='',
     url='https://www.spaceone.dev/',
     author='MEGAZONE SpaceONE Team',
@@ -35,6 +35,7 @@ setup(
         'spaceone-api',
         'google-auth',
         'google-api-python-client',
+        'schematics'
     ],
     zip_safe=False,
 )
