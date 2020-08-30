@@ -66,7 +66,6 @@ disk = TableDynamicLayout.set_fields('Disk', root_path='disks', fields=[
 
 nic = TableDynamicLayout.set_fields('NIC', root_path='nics', fields=[
     TextDyField.data_source('Index', 'device_index'),
-    # TextDyField.data_source('MAC Address', 'mac_address'),
     ListDyField.data_source('IP Addresses', 'ip_addresses', options={'delimiter': '<br>'}),
     TextDyField.data_source('CIDR', 'cidr'),
     TextDyField.data_source('Public IP', 'public_ip_address')
