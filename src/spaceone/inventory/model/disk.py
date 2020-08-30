@@ -25,9 +25,12 @@ from schematics.types import StringType, IntType, FloatType, BooleanType, ModelT
   "kind": "compute#disk"
 }
 '''
+
+
 class Labels(Model):
     key = StringType()
     value = StringType()
+
 
 class DiskTags(Model):
     disk_id = StringType(serialize_when_none=False)
@@ -41,6 +44,7 @@ class DiskTags(Model):
     read_throughput = FloatType(serialize_when_none=False)
     write_throughput = FloatType(serialize_when_none=False)
     labels = ListType(ModelType(Labels), default=[], serialize_when_none=False)
+
 
 class Disk(Model):
     device_index = IntType()

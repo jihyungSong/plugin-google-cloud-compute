@@ -74,7 +74,7 @@ class VMInstanceManager(BaseManager):
         server_dic.update({
             'data': {
                 'os': os_data,
-                'gcp': google_cloud_data,
+                'google_cloud': google_cloud_data,
                 'hardware': hardware_data,
                 'compute': compute_data
             }

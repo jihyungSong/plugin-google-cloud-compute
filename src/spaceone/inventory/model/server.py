@@ -1,5 +1,5 @@
 from schematics import Model
-from schematics.types import serializable, ModelType, ListType, StringType
+from schematics.types import ModelType, ListType, StringType
 from spaceone.inventory.model import OS, GoogleCloud, Hardware, SecurityGroup, Compute, LoadBalancer, VPC, Subnet, \
     AutoScaler, NIC, Disk, ServerMetadata
 
@@ -13,14 +13,14 @@ class ReferenceModel(Model):
 
 class ServerData(Model):
     os = ModelType(OS)
-    gcp = ModelType(GoogleCloud)
+    google_cloud = ModelType(GoogleCloud)
     hardware = ModelType(Hardware)
     compute = ModelType(Compute)
     load_balancers = ListType(ModelType(LoadBalancer))
     security_group = ListType(ModelType(SecurityGroup))
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
-    auto_scalers = ModelType(AutoScaler, serialize_when_none=False)
+    auto_scaler = ModelType(AutoScaler, serialize_when_none=False)
 
 
 class Server(Model):
@@ -36,11 +36,12 @@ class Server(Model):
     disks = ListType(ModelType(Disk))
     data = ModelType(ServerData)
     _metadata = ModelType(ServerMetadata, serialized_name='metadata')
+    reference = ModelType(ReferenceModel)
 
-    @serializable
-    def reference(self):
-        return {
-            "resource_id": "",
-            "external_link": f"https://console.cloud.google.com/compute/instancesDetail/zones/{self.zone}instances/dk-instance01?project={self.data.compute.account}"
-        }
+    # @serializable
+    # def reference(self):
+    #     return {
+    #         "resource_id": ServerData.gcp.self_link,
+    #         "external_link": f"https://console.cloud.google.com/compute/instancesDetail/zones/{self.zone}instances/dk-instance01?project={self.data.compute.account}"
+    #     }
 

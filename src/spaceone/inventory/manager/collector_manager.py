@@ -7,7 +7,7 @@ from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
     DiskManager, NICManager, VPCManager, SecurityGroupManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
-from spaceone.inventory.model.server import Server
+from spaceone.inventory.model.server import Server, ReferenceModel
 from spaceone.inventory.model.region import Region
 
 
@@ -114,15 +114,19 @@ class CollectorManager(BaseManager):
         server_data['data'].update({
             'load_balancers': load_balancer_vos,
             'security_group': sg_groups_vos,
-            'auto_scalers': auto_scaler_vo,
+            'auto_scaler': auto_scaler_vo,
             'vpc': vpc_vo,
             'subnet': subnet_vo,
         })
         server_data.update({
             '_metadata': meta_manager.get_metadata(),
+            'reference': ReferenceModel({
+                'resource_id': server_data['data']['google_cloud']['self_link'],
+                'external_link': f"https://console.cloud.google.com/compute/instancesDetail/zones/{zone}instances/{server_data['name']}?project={server_data['data']['compute']['account']}"
+            })
         })
 
-        return (Server(server_data, strict=False))
+        return Server(server_data, strict=False)
 
     def list_resources(self, params):
         '''
@@ -167,11 +171,11 @@ class CollectorManager(BaseManager):
         #     return []
 
     def list_subnets(self, params):
-        print(f"[START] LIST Subnet {params['region']}")
+        # print(f"[START] LIST Subnet {params['region']}")
         return self.gcp_connector.list_subnets(region=params['region'])
 
     def list_forwarding_rules(self, params):
-        print(f"LIST Forwarding Rules START.. {params['region']}")
+        # print(f"LIST Forwarding Rules START.. {params['region']}")
         return self.gcp_connector.list_forwarding_rules(region=params['region'])
 
     def list_target_pools(self, params):
@@ -184,7 +188,7 @@ class CollectorManager(BaseManager):
         return self.gcp_connector.list_region_backend_svcs(region=params['region'])
 
     def get_global_resources(self, secret_data, regions):
-        print("[ GET zone independent resources ]")
+        # print("[ GET zone independent resources ]")
         if self.gcp_connector is None:
             self.set_connector(secret_data)
 
@@ -227,7 +231,7 @@ class CollectorManager(BaseManager):
         #         for result in future.result():
         #             forwarding_rules.append(result)
 
-        print("====== END of zone independent resources")
+        # print("====== END of zone independent resources")
 
         return {
             'images': images,

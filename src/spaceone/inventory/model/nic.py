@@ -24,12 +24,11 @@ from schematics.types import StringType, IntType, ListType, DictType
 '''
 
 class NIC(Model):
-    device_index = IntType() #ok
+    device_index = IntType()                    # ok
     device = StringType(default="")
-    # subnetwork 로 해서 찾아와야 함
     cidr = StringType()
-    nic_type = StringType(default="Virtual")  # 확인 필요
-    ip_addresses = ListType(StringType())     # 확인필요 (accessConfig)
+    nic_type = StringType(default="Virtual")    # 확인 필요
+    ip_addresses = ListType(StringType())       # 확인필요 (accessConfig)
     mac_address = StringType(default="")
     public_ip_address = StringType()
     tags = DictType(StringType, default={})

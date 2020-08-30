@@ -187,7 +187,7 @@ class CollectorService(BaseService):
         print(f'############## TOTAL FINISHED {time.time() - start_time} Sec ##################')
 
     def set_params_for_zones(self, params, all_regions):
-        print("[ SET Params for ZONES ]")
+        # print("[ SET Params for ZONES ]")
         params_for_zones = []
 
         (query, instance_ids, filter_region_name) = self._check_query(params['filter'])
@@ -226,7 +226,7 @@ class CollectorService(BaseService):
                 match_zones = self.match_zones_from_region(all_regions, _region)
 
         if not match_zones:
-            print(f'region count = {len(all_regions)}')
+            # print(f'region count = {len(all_regions)}')
             for region in all_regions:
                 for zone in region.get('zones', []):
                     match_zones.append({'zone': zone.split('/')[-1], 'region': region['name']})
