@@ -4,13 +4,12 @@ from spaceone.inventory.model.google_cloud import GoogleCloud
 from spaceone.inventory.model.os import OS
 from spaceone.inventory.model.hardware import Hardware
 
-
 class VMInstanceManager(BaseManager):
 
     def __init__(self):
         pass
 
-    def get_server_info(self, instance, instance_types, disks, zone_info):
+    def get_server_info(self, instance, instance_types, disks, zone_info, public_images):
         '''
         server_data = {
             "name": '',
@@ -65,7 +64,7 @@ class VMInstanceManager(BaseManager):
         }
         '''
 
-        os_type, os_data = self.get_os_type_and_data(instance)
+        os_type, os_data = self.get_os_type_and_data(instance, public_images)
         server_dic = self.get_server_dic(instance, os_type, zone_info)
         google_cloud_data = self.get_google_cloud_data(instance)
         hardware_data = self.get_hardware_data(instance, instance_types)
@@ -96,9 +95,11 @@ class VMInstanceManager(BaseManager):
 
         return server_data
 
-    def get_os_type_and_data(self, instance):
+    def get_os_type_and_data(self, instance, public_images):
+
         disk_info = instance.get("disks", [])
         os_dists = disk_info[0].get('licenses', []) if len(disk_info) > 0 else []
+        licenses = disk_info[0].get('licenses', []) if len(disk_info) > 0 else []
         os_type = "LINUX"
         os_identity = ''
 
@@ -110,14 +111,39 @@ class VMInstanceManager(BaseManager):
                     os_type = "WINDOWS"
                 break
 
+        proper_image = self._get_appropriate_image_info(os_identity, licenses, public_images)
+
         os_data = {
             'details': '',
-            'os_distro': os_identity,
-            'os_license': os_dists,
+            'os_distro': '',
             'os_arch': ''
         }
 
+        if proper_image is not None:
+            os_data.update({
+                'os_distro': proper_image.get('name', ''),
+                'details': proper_image.get('description', '')
+            })
+
         return os_type, OS(os_data, strict=False)
+
+    @staticmethod
+    def _get_appropriate_image_info(os_identity, licenses, public_images):
+        image_info = None
+
+        for key, images in public_images.items():
+            find = False
+
+            if key in os_identity:
+                for image in images:
+                    if licenses == image.get('licenses', []):
+                        image_info = image
+                        find = True
+                        break
+            if find:
+                break
+
+        return image_info
 
     def get_google_cloud_data(self, instance):
         google_cloud = {
@@ -167,12 +193,13 @@ class VMInstanceManager(BaseManager):
 
         compute_data = {
             'keypair': '',
+            'public_ip_address': self._get_public_ip_address(instance),
             'az': zone_info.get('zone', ''),            # zone_name
             'instance_id': instance.get('id'),
             'instance_name': instance.get('name', ''),
             'instance_state': instance.get('status'),
             'instance_type': self._get_instance_type(instance),
-            'account': zone_info.get('project_id', ''),
+            'account_id': zone_info.get('project_id', ''),
             'image': self._get_images(instance, disks),
             'launched_at': instance.get('creationTimestamp'),
             'tags': self._get_tags_only_string_values(instance)
@@ -229,6 +256,20 @@ class VMInstanceManager(BaseManager):
                 break
         return primary_ip_address
 
+    @staticmethod
+    def _get_public_ip_address(instance):
+        public_ip_address = ''
+        networks = instance.get('networkInterfaces', [])
+        for i, v in enumerate(networks):
+            if i == 0:
+                access_configs = v.get('accessConfigs', [])
+                for access_config in access_configs:
+                    nat_ip = access_config.get('natIP', '')
+                    if nat_ip != '':
+                        primary_ip_address = nat_ip
+                        break
+                break
+        return primary_ip_address
 
     @staticmethod
     def _get_ip_addresses(instance):

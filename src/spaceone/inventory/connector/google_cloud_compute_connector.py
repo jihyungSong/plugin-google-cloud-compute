@@ -46,7 +46,7 @@ class GoogleCloudComputeConnector(BaseConnector):
         return result.get('items', [])
 
     def list_instances(self, **query):
-        status_filter = {'key': 'status', 'values': ['STAGING', 'RUNNING', 'STOPPING', 'REPAIRING']}
+        status_filter = {'key': 'status', 'values': ['PROVISIONING', 'STAGING', 'RUNNING', 'STOPPING', 'REPAIRING', 'SUSPENDING', 'SUSPENDED', 'TERMINATED']}
 
         if 'filter' in query:
             query.get('filter').append(status_filter)
@@ -98,6 +98,11 @@ class GoogleCloudComputeConnector(BaseConnector):
     def list_firewalls(self, **query):
         query = self.generate_query(**query)
         response = self.client.firewalls().list(**query).execute()
+        firewall = response.get('items', [])
+        return firewall
+
+    def list_public_images(self, **query):
+        response = self.client.images().list(**query).execute()
         firewall = response.get('items', [])
         return firewall
 

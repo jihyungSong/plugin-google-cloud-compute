@@ -11,9 +11,9 @@ google_cloud_instance = ItemDynamicLayout.set_fields('VM Instance', fields=[
     TextDyField.data_source('Instance Name', 'data.compute.instance_name'),
     EnumDyField.data_source('Instance State', 'data.compute.instance_state', default_state={
         'safe': ['RUNNING'],
-        'warning': ['STAGING', 'STOPPING'],
-        'disable': ['REPAIRING'],
-        'alert': ['REPAIRING']
+        'warning': ['STAGING', 'PROVISIONING', 'REPAIRING', 'STOPPING', 'SUSPENDING'],
+        'disable': ['TERMINATED'],
+        'alert': ['SUSPENDED']
     }),
     TextDyField.data_source('Instance Type', 'data.compute.instance_type'),
     TextDyField.data_source('Image', 'data.compute.image'),
@@ -24,7 +24,7 @@ google_cloud_instance = ItemDynamicLayout.set_fields('VM Instance', fields=[
     EnumDyField.data_source('Deletion Protection', 'data.google_cloud.deletion_protection', default_badge={
         'indigo.500': ['true'], 'coral.600': ['false']
     }),
-    TextDyField.data_source('Public IP', 'data.public_ip_address'),
+    TextDyField.data_source('Public IP', 'data.compute.public_ip_address'),
     ListDyField.data_source('IP Addresses', 'ip_addresses',
                             default_badge={'type': 'outline', 'delimiter': '<br>'}),
     ListDyField.data_source('Affected Rules', 'data.compute.sg_group_names',
