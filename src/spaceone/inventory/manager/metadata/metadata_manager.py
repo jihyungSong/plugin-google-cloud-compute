@@ -6,7 +6,7 @@ from spaceone.inventory.model.metadata.metadata_dynamic_field import TextDyField
     DateTimeDyField
 
 google_cloud_instance = ItemDynamicLayout.set_fields('VM Instance', fields=[
-    TextDyField.data_source('Account', 'data.compute.account'),
+    TextDyField.data_source('Account', 'data.compute.account_id'),
     TextDyField.data_source('Instance ID', 'data.compute.instance_id'),
     TextDyField.data_source('Instance Name', 'data.compute.instance_name'),
     EnumDyField.data_source('Instance State', 'data.compute.instance_state', default_state={
