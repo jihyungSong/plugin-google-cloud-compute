@@ -111,7 +111,7 @@ class VMInstanceManager(BaseManager):
                     os_type = "WINDOWS"
                 break
 
-        proper_image = self._get_appropriate_image_info(os_identity, licenses, public_images)
+        proper_image, dist_context = self._get_appropriate_image_info(os_identity, licenses, public_images)
 
         os_data = {
             'details': '',
@@ -121,7 +121,7 @@ class VMInstanceManager(BaseManager):
 
         if proper_image is not None:
             os_data.update({
-                'os_distro': proper_image.get('name', ''),
+                'os_distro': 'windows-server' if dist_context == 'windows' else dist_context,
                 'details': proper_image.get('description', '')
             })
 
@@ -130,7 +130,7 @@ class VMInstanceManager(BaseManager):
     @staticmethod
     def _get_appropriate_image_info(os_identity, licenses, public_images):
         image_info = None
-
+        distro_context = ''
         for key, images in public_images.items():
             find = False
 
@@ -138,12 +138,13 @@ class VMInstanceManager(BaseManager):
                 for image in images:
                     if licenses == image.get('licenses', []):
                         image_info = image
+                        distro_context = key
                         find = True
                         break
             if find:
                 break
 
-        return image_info
+        return image_info, distro_context
 
     def get_google_cloud_data(self, instance):
         google_cloud = {

@@ -99,7 +99,7 @@ lb = TableDynamicLayout.set_fields('LB', root_path='data.load_balancers', fields
     }),
 ])
 
-labels = TableDynamicLayout.set_fields('Labels', root_path='data.google_cloud.labels', fields=[
+labels = TableDynamicLayout.set_fields('Google Cloud Labels', root_path='data.google_cloud.labels', fields=[
     TextDyField.data_source('Key', 'key'),
     TextDyField.data_source('Value', 'value'),
 ])
