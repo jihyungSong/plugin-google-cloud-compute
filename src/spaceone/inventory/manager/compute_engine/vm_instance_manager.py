@@ -111,40 +111,35 @@ class VMInstanceManager(BaseManager):
                     os_type = "WINDOWS"
                 break
 
-        proper_image, dist_context = self._get_appropriate_image_info(os_identity, licenses, public_images)
+        os_data = self._get_appropriate_image_info(os_identity, licenses, public_images)
+        return os_type, OS(os_data, strict=False)
 
+    @staticmethod
+    def _get_appropriate_image_info(os_identity, licenses, public_images):
+        # temp arch lists will be updated when full list has prepared.
+        arch_list = ['x86_64', 'x86_32', 'x64', 'x86', 'amd64']
         os_data = {
             'details': '',
             'os_distro': '',
             'os_arch': ''
         }
-
-        if proper_image is not None:
-            os_data.update({
-                'os_distro': 'windows-server' if dist_context == 'windows' else dist_context,
-                'details': proper_image.get('description', '')
-            })
-
-        return os_type, OS(os_data, strict=False)
-
-    @staticmethod
-    def _get_appropriate_image_info(os_identity, licenses, public_images):
-        image_info = None
-        distro_context = ''
         for key, images in public_images.items():
             find = False
-
             if key in os_identity:
                 for image in images:
                     if licenses == image.get('licenses', []):
                         image_info = image
-                        distro_context = key
+                        os_arch_index = [i for i, e in enumerate(arch_list) if e in image.get('description', '')]
+
+                        os_data.update({'os_distro': 'windows-server' if key == 'windows' else key,
+                                        'details': image.get('description', ''),
+                                        'os_arch': arch_list[os_arch_index[0]] if len(os_arch_index) > 0 else ''})
                         find = True
                         break
             if find:
                 break
 
-        return image_info, distro_context
+        return os_data
 
     def get_google_cloud_data(self, instance):
         google_cloud = {
