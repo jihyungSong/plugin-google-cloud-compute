@@ -19,4 +19,4 @@ class GoogleCloud(Model):
     reservation_affinity = StringType(default="ANY_RESERVATION")
     deletion_protection = BooleanType(default=False)
     scheduling = ModelType(Scheduling)
-    labels = ListType(ModelType(Labels), default=[], serialize_when_none=False)
+    labels = ListType(ModelType(Labels), default=[])
