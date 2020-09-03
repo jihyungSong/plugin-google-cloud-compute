@@ -195,7 +195,7 @@ class VMInstanceManager(BaseManager):
             'instance_name': instance.get('name', ''),
             'instance_state': instance.get('status'),
             'instance_type': self._get_instance_type(instance),
-            'account_id': zone_info.get('project_id', ''),
+            'account': zone_info.get('project_id', ''),
             'image': self._get_images(instance, disks),
             'launched_at': instance.get('creationTimestamp'),
             'tags': self._get_tags_only_string_values(instance)

@@ -10,7 +10,7 @@ class Compute(Model):
     instance_name = StringType(default='')
     instance_state = StringType(choices=('PROVISIONING', 'STAGING', 'RUNNING', 'STOPPING', 'REPAIRING', 'SUSPENDING', 'SUSPENDED', 'TERMINATED'))
     instance_type = StringType()
-    account_id = StringType()
+    account = StringType()
     image = StringType()
     launched_at = DateTimeType()
     sg_group_names = ListType(StringType, default=[])
