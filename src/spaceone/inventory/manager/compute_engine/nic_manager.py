@@ -51,7 +51,7 @@ class NICManager(BaseManager):
         for idx, access_config in enumerate(access_configs):
             nat_ip = access_config.get('natIP', '')
             if nat_ip != '':
-                ip_addresses.append(nat_ip)
+                #ip_addresses.append(nat_ip)
                 if idx == 0:
                     public_ip_address = nat_ip
 

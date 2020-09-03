@@ -4,12 +4,13 @@ from schematics.types import ListType, StringType, DateTimeType, DictType
 
 class Compute(Model):
     keypair = StringType(default="")
-    az = StringType()                       # zone_name
+    public_ip_address = StringType()
+    az = StringType()
     instance_id = StringType()
     instance_name = StringType(default='')
-    instance_state = StringType(choices=('STAGING', 'RUNNING', 'STOPPING', 'REPAIRING'))
+    instance_state = StringType(choices=('PROVISIONING', 'STAGING', 'RUNNING', 'STOPPING', 'REPAIRING', 'SUSPENDING', 'SUSPENDED', 'TERMINATED'))
     instance_type = StringType()
-    account = StringType()                  # Project_id
+    account = StringType()
     image = StringType()
     launched_at = DateTimeType()
     sg_group_names = ListType(StringType, default=[])

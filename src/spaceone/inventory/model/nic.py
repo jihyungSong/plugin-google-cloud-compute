@@ -24,7 +24,7 @@ from schematics.types import StringType, IntType, ListType, DictType
 '''
 
 class NIC(Model):
-    device_index = IntType()                    # ok
+    device_index = IntType()
     device = StringType(default="")
     cidr = StringType()
     nic_type = StringType(default="Virtual")    # 확인 필요
