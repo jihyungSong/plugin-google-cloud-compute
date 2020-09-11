@@ -3,212 +3,319 @@ __all__ = ['CollectorManager']
 import time
 import logging
 from spaceone.core.manager import BaseManager
-from spaceone.inventory.connector import EC2Connector
-from spaceone.inventory.manager.ec2 import EC2InstanceManager, AutoScalingGroupManager, LoadBalancerManager, \
-    DiskManager, NICManager, VPCManager, SecurityGroupRuleManager
+from spaceone.inventory.connector import GoogleCloudComputeConnector
+from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
+    DiskManager, NICManager, VPCManager, SecurityGroupManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
-from spaceone.inventory.model.server import Server
+from spaceone.inventory.model.server import Server, ReferenceModel
 from spaceone.inventory.model.region import Region
 
-
 _LOGGER = logging.getLogger(__name__)
+NUMBER_OF_CONCURRENT = 20
 
 
 class CollectorManager(BaseManager):
 
+    gcp_connector = None
+
     def __init__(self, transaction):
         super().__init__(transaction)
 
-    def verify(self, secret_data, region_name):
+    def verify(self, options, secret_data):
         """ Check connection
         """
-        ec2_connector = self.locator.get_connector('EC2Connector')
-        r = ec2_connector.verify(secret_data, region_name)
+        self.gcp_connector = self.locator.get_connector('GoogleCloudComputeConnector')
+        r = self.gcp_connector.verify(options, secret_data)
         # ACTIVE/UNKNOWN
         return r
 
-    def list_regions(self, secret_data, region_name):
-        ec2_connector: EC2Connector = self.locator.get_connector('EC2Connector')
-        ec2_connector.set_client(secret_data, region_name)
+    def set_connector(self, secret_data):
+        self.gcp_connector: GoogleCloudComputeConnector = self.locator.get_connector('GoogleCloudComputeConnector')
+        self.gcp_connector.get_connect(secret_data)
 
-        return ec2_connector.list_regions()
+    def list_regions(self, secret_data):
+        if self.gcp_connector is None:
+            self.set_connector(secret_data)
 
-    def list_instances(self, params):
-        server_vos = []
-        ec2_connector: EC2Connector = self.locator.get_connector('EC2Connector')
-        ec2_connector.set_client(params['secret_data'], params['region_name'])
+        return self.gcp_connector.list_regions()
 
-        instance_filter = {}
-        # Instance list and account ID
-        if 'instance_ids' in params and len(params['instance_ids']) > 0:
-            instance_filter.update({'Filters': [{'Name': 'instance-id', 'Values': params['instance_ids']}]})
+    def list_zones(self, secret_data):
+        if self.gcp_connector is None:
+            self.set_connector(secret_data)
 
-        instances, account_id = ec2_connector.list_instances(**instance_filter)
+        return self.gcp_connector.list_zones()
 
-        print(f'===== [{params["region_name"]}]  /  INSTANCE COUNT : {len(instances)}')
+    def list_instances_only(self, params):
+        instance_filter = {'zone': params['zone_info']['zone']}
 
-        if len(instances) > 0:
-            # Instance Type
-            itypes = ec2_connector.list_instance_types()
+        if len(params.get('instance_ids', [])) > 0:
+            instance_filter.update({'filter': [{'key': 'id', 'values': params['instance_ids']}]})
 
-            # Image
-            images = ec2_connector.list_images(ImageIds=self.get_image_ids(instances))
+        return self.gcp_connector.list_instances(**instance_filter)
 
-            # Autoscaling group list
-            auto_scaling_groups = ec2_connector.list_auto_scaling_groups()
-            launch_configurations = ec2_connector.list_launch_configurations()
+    def get_instance(self, zone_info, instance, global_resources):
+        zone = zone_info['zone']
 
-            # LB list
-            load_balancers = ec2_connector.list_load_balancers()
-            target_groups = ec2_connector.list_target_groups()
+        # VPC
+        vpcs = global_resources.get('vpcs', [])
+        subnets = global_resources.get('subnets', [])
 
-            for target_group in target_groups:
-                target_healths = ec2_connector.list_target_health(target_group.get('TargetGroupArn'))
-                target_group['target_healths'] = target_healths
+        # All Public Images
+        public_images = global_resources.get('public_images', {})
 
-            # VPC
-            vpcs = ec2_connector.list_vpcs()
-            subnets = ec2_connector.list_subnets()
+        # URL Maps
+        url_maps = global_resources.get('url_maps', [])
+        backend_svcs = global_resources.get('backend_svcs', [])
+        target_pools = global_resources.get('target_pools', [])
+        # Forwarding Rules
+        forwarding_rules = global_resources.get('forwarding_rules', [])
 
-            # Volume
-            volumes = ec2_connector.list_volumes()
+        # Security Group (Firewall)
+        firewalls = global_resources.get('fire_walls', [])
 
-            # IP
-            eips = ec2_connector.list_elastic_ips()
+        # Get Instance Groups
+        instance_group = self.gcp_connector.list_instance_group_managers(zone=zone)
+        self.gcp_connector.set_instance_into_instance_group_managers(instance_group, zone=zone)
 
-            # Security Group
-            sgs = ec2_connector.list_security_groups()
+        # Get Machine Types
+        instance_types = self.gcp_connector.list_machine_types(zone=zone)
 
-            ins_manager: EC2InstanceManager = EC2InstanceManager(params, ec2_connector=ec2_connector)
-            asg_manager: AutoScalingGroupManager = AutoScalingGroupManager(params)
-            elb_manager: LoadBalancerManager = LoadBalancerManager(params, ec2_connector=ec2_connector)
-            disk_manager: DiskManager = DiskManager(params)
-            nic_manager: NICManager = NICManager(params)
-            vpc_manager: VPCManager = VPCManager(params)
-            sg_manager: SecurityGroupRuleManager = SecurityGroupRuleManager(params)
-            meta_manager: MetadataManager = MetadataManager()
+        # Autoscaling group list
+        auto_scaler = self.gcp_connector.list_auto_scalers(zone=zone)
 
-            for instance in instances:
-                instance_id = instance.get('InstanceId')
-                instance_ip = instance.get('PrivateIpAddress')
+        # disks
+        disks = self.gcp_connector.list_disk(zone=zone)
+        # TODO: if distro has additional requirement with os_distros for future
+        # disk_types = self.gcp_connector.list_disk_types(zone=zone)
 
-                server_data = ins_manager.get_server_info(instance, itypes, images, eips)
-                auto_scaling_group_vo = asg_manager.get_auto_scaling_info(instance_id, auto_scaling_groups,
-                                                                          launch_configurations)
+        # call_up all the managers
+        vm_instance_manager: VMInstanceManager = VMInstanceManager()
+        auto_scaler_manager: AutoScalerManager = AutoScalerManager()
+        lb_manager: LoadBalancerManager = LoadBalancerManager()
+        disk_manager: DiskManager = DiskManager()
+        nic_manager: NICManager = NICManager()
+        vpc_manager: VPCManager = VPCManager()
+        security_group_manager: SecurityGroupManager = SecurityGroupManager()
+        meta_manager: MetadataManager = MetadataManager()
 
-                load_balancer_vos = elb_manager.get_load_balancer_info(load_balancers, target_groups,
-                                                                       instance_id, instance_ip)
+        server_data = vm_instance_manager.get_server_info(instance, instance_types, disks, zone_info, public_images)
+        auto_scaler_vo = auto_scaler_manager.get_auto_scaler_info(instance, instance_group, auto_scaler)
+        load_balancer_vos = lb_manager.get_load_balancer_info(instance, instance_group, backend_svcs, url_maps, target_pools, forwarding_rules)
+        disk_vos = disk_manager.get_disk_info(instance, disks)
+        vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance, vpcs, subnets)
+        nic_vos = nic_manager.get_nic_info(instance, subnet_vo)
+        sg_groups_vos = security_group_manager.get_security_group_rules_info(instance, firewalls)
+        sg_group_names = [d.get('security_group_name') for d in sg_groups_vos if d.get('security_group_name', '') != '']
+        
+        server_data.update({
+            'nics': nic_vos,
+            'disks': disk_vos,
+        })
 
-                disk_vos = disk_manager.get_disk_info(self.get_volume_ids(instance), volumes)
-                vpc_vo, subnet_vo = vpc_manager.get_vpc_info(instance.get('VpcId'), instance.get('SubnetId'),
-                                                             vpcs, subnets, params['region_name'])
+        server_data['data']['compute']['sg_group_names'] = sg_group_names
+        server_data['data'].update({
+            'load_balancers': load_balancer_vos,
+            'security_group': sg_groups_vos,
+            'auto_scaler': auto_scaler_vo,
+            'vpc': vpc_vo,
+            'subnet': subnet_vo,
+        })
+        server_data.update({
+            '_metadata': meta_manager.get_metadata(),
+            'reference': ReferenceModel({
+                'resource_id': server_data['data']['google_cloud']['self_link'],
+                'external_link': f"https://console.cloud.google.com/compute/instancesDetail/zones/{zone}instances/{server_data['name']}?project={server_data['data']['compute']['account_id']}"
+            })
+        })
 
-                nic_vos = nic_manager.get_nic_info(instance.get('NetworkInterfaces'), subnet_vo)
-
-                sg_ids = [security_group.get('GroupId') for security_group in instance.get('SecurityGroups', []) if
-                          security_group.get('GroupId') is not None]
-                sg_rules_vos = sg_manager.get_security_group_rules_info(sg_ids, sgs)
-
-                server_data.update({
-                    'nics': nic_vos,
-                    'disks': disk_vos,
-                })
-
-                server_data['data'].update({
-                    'load_balancers': load_balancer_vos,
-                    'security_group_rules': sg_rules_vos,
-                    'auto_scaling_group': auto_scaling_group_vo,
-                    'vpc': vpc_vo,
-                    'subnet': subnet_vo,
-                })
-
-                # IP addr : ip_addresses = data.compute.eip + nics.ip_addresses + data.public_ip_address
-                server_data.update({
-                    'ip_addresses': self.merge_ip_addresses(server_data)
-                })
-
-                server_data['data']['compute']['account_id'] = account_id
-
-                server_data.update({
-                    '_metadata': meta_manager.get_metadata(),
-                })
-
-                server_vos.append(Server(server_data, strict=False))
-
-        return server_vos
+        return Server(server_data, strict=False)
 
     def list_resources(self, params):
+        '''
+        params = {
+            'zone_info': {
+               'region': 'us-east-1,
+               'zone': 'us-east-1a'
+            },
+            'query': query,
+            'secret_data': 'secret_data',
+            'instance_ids': [instance_id, instance_id, ...],
+            'resources': {
+                'url_maps': url_maps,
+                'images': images,
+                'vpcs': vpcs,
+                'fire_walls': fire_walls,
+                'subnets': subnets,
+                'forwarding_rules': forwarding_rules,
+            },
+            'instances': [...]
+        }
+        '''
+
+        print(f"START LIST Resources {params['zone_info']['zone']}")
         start_time = time.time()
 
-        try:
-            resources = self.list_instances(params)
-            print(f'   [{params["region_name"]}] Finished {time.time() - start_time} Seconds')
-            return resources
+        # try:
+        secret_data = params.get('secret_data', {})
 
-        except Exception as e:
-            print(f'[ERROR: {params["region_name"]}] : {e}')
-            return []
+        zone_info = params.get('zone_info')
+        self._set_project_id_to_zone_info(zone_info, secret_data.get('project_id', ''))
 
-    def get_volume_ids(self, instance):
-        block_device_mappings = instance.get('BlockDeviceMappings', [])
-        return [block_device_mapping['Ebs']['VolumeId'] for block_device_mapping in block_device_mappings if block_device_mapping.get('Ebs') is not None]
+        instances = params.get('instances', [])
+        global_resources = params['resources']
 
-    def get_image_ids(self, instances):
-        return [instance.get('ImageId') for instance in instances if instance.get('ImageId') is not None]
+        resources = [self.get_instance(zone_info, instance, global_resources) for instance in instances]
+        print(f'   [{params["zone_info"]["zone"]}] Finished {time.time() - start_time} Seconds')
+        return resources
 
-    def merge_ip_addresses(self, server_data):
-        compute_data = server_data['data']['compute']
-        nics = server_data['nics']
+        # except Exception as e:
+        #     print(f'[ERROR: {params["zone_info"]["zone"]}] : {e}')
+        #     return []
 
-        nic_ip_addresses = []
-        for nic in nics:
-            nic_ip_addresses.extend(nic.ip_addresses)
+    def list_subnets(self, params):
+        # print(f"[START] LIST Subnet {params['region']}")
+        return self.gcp_connector.list_subnets(region=params['region'])
 
-        merge_ip_address = compute_data.eip + nic_ip_addresses
+    def list_forwarding_rules(self, params):
+        # print(f"LIST Forwarding Rules START.. {params['region']}")
+        return self.gcp_connector.list_forwarding_rules(region=params['region'])
 
-        if server_data['data']['public_ip_address'] != '':
-            merge_ip_address.append(server_data['data']['public_ip_address'])
+    def list_target_pools(self, params):
+        return self.gcp_connector.list_target_pools(region=params['region'])
 
-        return list(set(merge_ip_address))
+    def list_region_url_maps(self, params):
+        return self.gcp_connector.list_region_url_maps(region=params['region'])
+
+    def list_region_backend_svcs(self, params):
+        return self.gcp_connector.list_region_backend_svcs(region=params['region'])
+
+    def list_public_images(self):
+
+        public_images = {}
+        public_image_list = [
+            {'key': 'centos', 'value': 'centos-cloud'},
+            {'key': 'coreos', 'value': 'coreos-cloud'},
+            {'key': 'debian', 'value': 'debian-cloud'},
+            {'key': 'google', 'value': 'google-containers'},
+            {'key': 'opensuse', 'value': 'opensuse-cloud'},
+            {'key': 'rhel', 'value': 'rhel-cloud'},
+            {'key': 'suse', 'value': 'suse-cloud'},
+            {'key': 'ubuntu', 'value': 'ubuntu-os-cloud'},
+            {'key': 'windows', 'value': 'windows-cloud'}
+        ]
+
+        for public_image in public_image_list:
+            image_list = self.gcp_connector.list_public_images(project=public_image.get('value'), orderBy='creationTimestamp desc')
+            public_images[public_image.get('key')] = image_list
+        return public_images
+
+    def get_global_resources(self, secret_data, regions):
+        # print("[ GET zone independent resources ]")
+        if self.gcp_connector is None:
+            self.set_connector(secret_data)
+
+        # Global sources within project_id
+        url_maps = self.gcp_connector.list_url_maps()
+        images = self.gcp_connector.list_images()
+        public_images = self.list_public_images()
+
+        vpcs = self.gcp_connector.list_vpcs()
+        fire_walls = self.gcp_connector.list_firewalls()
+        backend_svcs = self.gcp_connector.list_backend_svcs()
+
+        # Regional Sources with region parameter
+        subnets = []
+        forwarding_rules = []
+        target_pools = []
+
+        for region_param in self.generate_region_params(regions):
+            subnets.extend(self.list_subnets(region_param))
+            forwarding_rules.extend(self.list_forwarding_rules(region_param))
+            target_pools.extend(self.list_target_pools(region_param))
+            url_maps.extend(self.list_region_url_maps(region_param))
+            backend_svcs.extend(self.list_region_backend_svcs(region_param))
+
+        # Generate Thread Pool for collecting Subnets
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+        #     future_executors = []
+        #     for mt_param in mt_params:
+        #         future_executors.append(executor.submit(self.list_subnets, mt_param))
+        #
+        #     for future in concurrent.futures.as_completed(future_executors):
+        #         for result in future.result():
+        #             subnets.append(result)
+
+        # Generate Thread Pool for collecting Forwarding Rules
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+        #     future_executors = []
+        #     for mt_param in mt_params:
+        #         future_executors.append(executor.submit(self.list_forwarding_rules, mt_param))
+        #
+        #     for future in concurrent.futures.as_completed(future_executors):
+        #         for result in future.result():
+        #             forwarding_rules.append(result)
+
+        # print("====== END of zone independent resources")
+
+        return {
+            'public_images': public_images,
+            'images': images,
+            'vpcs': vpcs,
+            'subnets': subnets,
+            'fire_walls': fire_walls,
+            'forwarding_rules': forwarding_rules,
+            'target_pools': target_pools,
+            'url_maps': url_maps,
+            'backend_svcs': backend_svcs
+        }
+
+
+    def generate_region_params(self, regions):
+        return list(map(lambda region: {'region': region['name']}, regions))
+
+    @staticmethod
+    def _set_project_id_to_zone_info(zone_info, project_id):
+        if project_id != '':
+            zone_info.update({'project_id': project_id})
 
     @staticmethod
     def get_region_from_result(result):
         REGION_INFO = {
-            'us-east-1': {'name': 'US East (N. Virginia)', 'tags': {'latitude': '39.028760', 'longitude': '-77.458263'}},
-            'us-east-2': {'name': 'US East (Ohio)', 'tags': {'latitude': '40.103564', 'longitude': '-83.200092'}},
-            'us-west-1': {'name': 'US West (N. California)', 'tags': {'latitude': '37.242183', 'longitude': '-121.783380'}},
-            'us-west-2': {'name': 'US West (Oregon)', 'tags': {'latitude': '45.841046', 'longitude': '-119.658093'}},
-            'af-south-1': {'name': 'Africa (Cape Town)', 'tags': {'latitude': '-33.932268', 'longitude': '18.424434'}},
-            'ap-east-1': {'name': 'Asia Pacific (Hong Kong)', 'tags': {'latitude': '22.365560', 'longitude': '114.119420'}},
-            'ap-south-1': {'name': 'Asia Pacific (Mumbai)', 'tags': {'latitude': '19.147428', 'longitude': '73.013805'}},
-            'ap-northeast-3': {'name': 'Asia Pacific (Osaka-Local)', 'tags': {'latitude': '34.675638', 'longitude': '135.495706'}},
-            'ap-northeast-2': {'name': 'Asia Pacific (Seoul)', 'tags': {'latitude': '37.528547', 'longitude': '126.871867'}},
-            'ap-southeast-1': {'name': 'Asia Pacific (Singapore)', 'tags': {'latitude': '1.321259', 'longitude': '103.695942'}},
-            'ap-southeast-2	': {'name': 'Asia Pacific (Sydney)', 'tags': {'latitude': '-33.921423', 'longitude': '151.188076'}},
-            'ap-northeast-1': {'name': 'Asia Pacific (Tokyo)', 'tags': {'latitude': '35.648411', 'longitude': '139.792566'}},
-            'ca-central-1': {'name': 'Canada (Central)', 'tags': {'latitude': '43.650803', 'longitude': '-79.361824'}},
-            'cn-north-1': {'name': 'China (Beijing)', 'tags': {'latitude': '39.919635', 'longitude': '116.307237'}},
-            'cn-northwest-1': {'name': 'China (Ningxia)', 'tags': {'latitude': '37.354511', 'longitude': '106.106147'}},
-            'eu-central-1': {'name': 'Europe (Frankfurt)', 'tags': {'latitude': '50.098645', 'longitude': '8.632262'}},
-            'eu-west-1': {'name': 'Europe (Ireland)', 'tags': {'latitude': '53.330893', 'longitude': '-6.362217'}},
-            'eu-west-2': {'name': 'Europe (London)', 'tags': {'latitude': '51.519749', 'longitude': '-0.087804'}},
-            'eu-south-1': {'name': 'Europe (Milan)', 'tags': {'latitude': '45.448648', 'longitude': '9.147316'}},
-            'eu-west-3': {'name': 'Europe (Paris)', 'tags': {'latitude': '48.905302', 'longitude': '2.369778'}},
-            'eu-north-1': {'name': 'Europe (Stockholm)', 'tags': {'latitude': '59.263542', 'longitude': '18.104861'}},
-            'me-south-1': {'name': 'Middle East (Bahrain)', 'tags': {'latitude': '26.240945', 'longitude': '50.586321'}},
-            'sa-east-1': {'name': 'South America (São Paulo)', 'tags': {'latitude': '-23.493549', 'longitude': '-46.809319'}},
-            'us-gov-east-1': {'name': 'AWS GovCloud (US-East)'},
-            'us-gov-west-1': {'name': 'AWS GovCloud (US)'},
+            'asia-east1': {'name': 'Changhua County, Taiwan'},
+            'asia-east2': {'name': 'Hong Kong'},
+            'asia-northeast1': {'name': 'Tokyo, Japan'},
+            'asia-northeast2': {'name': 'Osaka, Japan'},
+            'asia-northeast3': {'name': 'Seoul, South Korea'},
+            'asia-south1': {'name': 'Mumbai, India'},
+            'asia-southeast1': {'name': 'Jurong West, Singapore'},
+            'asia-southeast2': {'name': 'Jakarta, Indonesia'},
+            'australia-southeast1': {'name': 'Sydney, Australia'},
+            'europe-north1': {'name': 'Hamina, Finland'},
+            'europe-west1': {'name': 'St. Ghislain, Belgium'},
+            'europe-west2': {'name': 'London, England, UK'},
+            'europe-west3': {'name': 'Frankfurt, Germany'},
+            'europe-west4': {'name': 'Eemshaven, Netherlands'},
+            'europe-west6': {'name': 'Zürich, Switzerland'},
+            'northamerica-northeast1': {'name': 'Montréal, Québec, Canada'},
+            'southamerica-east1': {'name': 'Osasco (São Paulo), Brazil'},
+            'us-central1': {'name': 'Council Bluffs, Iowa, USA'},
+            'us-east1': {'name': 'Moncks Corner, South Carolina, USA'},
+            'us-east4': {'name': 'Ashburn, Northern Virginia, USA'},
+            'us-west1': {'name': 'The Dalles, Oregon, USA'},
+            'us-west2': {'name': 'Los Angeles, California, USA'},
+            'us-west3': {'name': 'Salt Lake City, Utah, USA'},
+            'us-west4': {'name': 'Las Vegas, Nevada, USA'},
         }
 
-        match_region_info = REGION_INFO.get(getattr(result.data.compute, 'region_name', None))
+        match_region_info = REGION_INFO.get(result.get('region_code'))
 
         if match_region_info is not None:
             region_info = match_region_info.copy()
             region_info.update({
-                'region_code': result.data.compute.region_name
+                'region_code': result.get('region_code')
             })
 
             return Region(region_info, strict=False)
 
         return None
+

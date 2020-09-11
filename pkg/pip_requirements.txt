@@ -1,5 +1,5 @@
 spaceone-core
 spaceone-api
 spaceone-tester
-boto3
+google-api-python-client
 schematics

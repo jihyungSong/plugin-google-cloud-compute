@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import logging
 
 from spaceone.api.inventory.plugin import collector_pb2, collector_pb2_grpc

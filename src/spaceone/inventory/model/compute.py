@@ -1,18 +1,17 @@
 from schematics import Model
-from schematics.types import  StringType, DateTimeType, ListType, BooleanType
+from schematics.types import ListType, StringType, DateTimeType, DictType
 
 
 class Compute(Model):
-    eip = ListType(StringType())
-    keypair = StringType()
+    keypair = StringType(default="")
+    public_ip_address = StringType()
     az = StringType()
-    instance_state = StringType(choices=('pending', 'running', 'shutting-down', 'terminated', 'stopping', 'stopped'))
-    instance_type = StringType()
-    launched_at = DateTimeType()
-    region_name = StringType()
     instance_id = StringType()
     instance_name = StringType(default='')
-    termination_protection = BooleanType()
-    security_groups = ListType(StringType())
+    instance_state = StringType(choices=('PROVISIONING', 'STAGING', 'RUNNING', 'STOPPING', 'REPAIRING', 'SUSPENDING', 'SUSPENDED', 'TERMINATED'))
+    instance_type = StringType()
+    account = StringType()
     image = StringType()
-    account_id = StringType()
+    launched_at = DateTimeType()
+    sg_group_names = ListType(StringType, default=[])
+    tags = DictType(StringType, default={})

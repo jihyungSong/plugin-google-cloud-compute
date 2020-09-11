@@ -1,13 +1,10 @@
-# -*- coding: utf-8 -*-
 import time
 import logging
-import concurrent.futures
-
 from spaceone.core.service import *
 from spaceone.inventory.manager.collector_manager import CollectorManager
 
 _LOGGER = logging.getLogger(__name__)
-DEFAULT_REGION = 'us-east-1'
+
 FILTER_FORMAT = [
     {
         'key': 'project_id',
@@ -72,6 +69,7 @@ class CollectorService(BaseService):
         super().__init__(metadata)
         self.collector_manager: CollectorManager = self.locator.get_manager('CollectorManager')
 
+    @transaction
     @check_required(['options'])
     def init(self, params):
         """ init plugin by options
@@ -79,22 +77,11 @@ class CollectorService(BaseService):
         capability = {
             'filter_format': FILTER_FORMAT,
             'supported_resource_type': SUPPORTED_RESOURCE_TYPE
-        }
-        return {'metadata': capability}
-
-    @transaction
-    @check_required(['options'])
-    def init(self, params):
-        """ init plugin by options
-        """
-        capability = {
-            'filter_format':FILTER_FORMAT,
-            'supported_resource_type' : SUPPORTED_RESOURCE_TYPE
             }
         return {'metadata': capability}
 
     @transaction
-    @check_required(['options','secret_data'])
+    @check_required(['options', 'secret_data'])
     def verify(self, params):
         """ verify options capability
         Args:
@@ -109,13 +96,12 @@ class CollectorService(BaseService):
         """
         manager = self.locator.get_manager('CollectorManager')
         secret_data = params['secret_data']
-        region_name = params.get('region_name', DEFAULT_REGION)
-        active = manager.verify(secret_data, region_name)
-
+        options = params.get('options', {})
+        active = manager.verify(options, secret_data)
         return {}
 
     @transaction
-    @check_required(['options','secret_data', 'filter'])
+    @check_required(['options', 'secret_data', 'filter'])
     def list_resources(self, params):
         """ Get quick list of resources
         Args:
@@ -128,55 +114,142 @@ class CollectorService(BaseService):
         """
 
         start_time = time.time()
-        # parameter setting for multi threading
-        mp_params = self.set_params_for_regions(params)
+        all_regions = self.collector_manager.list_regions(params['secret_data'])
+
         resource_regions = []
         collected_region_code = []
 
         server_resource_format = {'resource_type': 'inventory.Server',
-                                  'match_rules': {'1': ['data.compute.instance_id']}}
+                                  'match_rules': {'1': ['reference.resource_id']}}
+
         region_resource_format = {'resource_type': 'inventory.Region',
                                   'match_rules': {'1': ['region_code', 'region_type']}}
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
-            future_executors = []
-            for mp_param in mp_params:
-                future_executors.append(executor.submit(self.collector_manager.list_resources, mp_param))
+        # parameter setting for multi threading
+        mt_params = self.set_params_for_zones(params, all_regions)
 
-            for future in concurrent.futures.as_completed(future_executors):
-                for result in future.result():
-                    collected_region = self.collector_manager.get_region_from_result(result)
+        # TODO: parallel collecting instances through multi threading
+        target_params = []
+        is_instance = False
+        for params in mt_params:
+            _instances = self.collector_manager.list_instances_only(params)
 
-                    if collected_region is not None and collected_region.region_code not in collected_region_code:
-                        resource_regions.append(collected_region)
-                        collected_region_code.append(collected_region.region_code)
+            if _instances:
+                params.update({
+                    'instances':  _instances
+                })
 
-                    yield result, server_resource_format
+                target_params.append(params)
+                is_instance = True
 
-        for resource_region in resource_regions:
-            yield resource_region, region_resource_format
+        if is_instance:
+            global_resources = self.collector_manager.get_global_resources(params['secret_data'], all_regions)
+
+            resources = []
+            for params in target_params:
+                params.update({
+                    'resources': global_resources
+                })
+
+                resources.extend(self.collector_manager.list_resources(params))
+
+            for resource in resources:
+                collected_region = self.collector_manager.get_region_from_result(resource)
+
+                if collected_region and collected_region.region_code not in collected_region_code:
+                    resource_regions.append(collected_region)
+                    collected_region_code.append(collected_region.region_code)
+
+                yield resource, server_resource_format
+
+            for resource_region in resource_regions:
+                yield resource_region, region_resource_format
+
+        #
+        # with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+        #     future_executors = []
+        #     for mt_param in mt_params:
+        #         future_executors.append(executor.submit(self.collector_manager.list_resources, mt_param))
+        #
+        #     for future in concurrent.futures.as_completed(future_executors):
+        #         for result in future.result():
+        #             collected_region = self.collector_manager.get_region_from_result(result)
+        #
+        #             if collected_region is not None and collected_region.region_code not in collected_region_code:
+        #                 resource_regions.append(collected_region)
+        #                 collected_region_code.append(collected_region.region_code)
+        #
+        #             yield result, server_resource_format
+        #
+        # for resource_region in resource_regions:
+        #     yield resource_region, region_resource_format
 
         print(f'############## TOTAL FINISHED {time.time() - start_time} Sec ##################')
 
-    def set_params_for_regions(self, params):
-        params_for_regions = []
+    def set_params_for_zones(self, params, all_regions):
+        # print("[ SET Params for ZONES ]")
+        params_for_zones = []
 
         (query, instance_ids, filter_region_name) = self._check_query(params['filter'])
-        query.append({'Name': 'instance-state-name', 'Values': ['running', 'shutting-down', 'stopping', 'stopped']})
+        target_zones = self.get_all_zones(params.get('secret_data', ''), filter_region_name, all_regions)
 
-        target_regions = self.get_all_regions(params['secret_data'], filter_region_name)
+        for target_zone in target_zones:
+            # _conn = self.locator.get_connector('GoogleCloudComputeConnector')
+            # _conn.get_connect(params['secret_data'])
 
-        for target_region in target_regions:
-            params_for_regions.append({
-                'region_name': target_region,
+            params_for_zones.append({
+                # 'connector': _conn,
+                'zone_info': target_zone,
                 'query': query,
                 'secret_data': params['secret_data'],
-                'instance_ids': instance_ids
+                'instance_ids': instance_ids,
+                # 'resources': resources
             })
 
-        return params_for_regions
+        return params_for_zones
 
-    def _check_query(self, query):
+    def get_all_zones(self, secret_data, filter_region_name, all_regions):
+        """ Find all zone name
+        Args:
+            secret_data: secret data
+            filter_region_name (list): list of region_name if wanted
+
+        Returns: list of zones
+        """
+        match_zones = []
+
+        if 'region_name' in secret_data:
+            match_zones = self.match_zones_from_region(all_regions, secret_data['region_name'])
+
+        if len(filter_region_name) > 0:
+            for _region in filter_region_name:
+                match_zones = self.match_zones_from_region(all_regions, _region)
+
+        if not match_zones:
+            # print(f'region count = {len(all_regions)}')
+            for region in all_regions:
+                for zone in region.get('zones', []):
+                    match_zones.append({'zone': zone.split('/')[-1], 'region': region['name']})
+
+        return match_zones
+
+    @staticmethod
+    def match_zones_from_region(all_regions, region):
+        match_zones = []
+
+        for _region in all_regions:
+            if _region['name'] == region:
+                for _zone in _region.get('zones', []):
+                    match_zones.append({'region': region, 'zone': _zone.split('/')[-1]})
+
+        return match_zones
+
+    @staticmethod
+    def get_full_resource_name(project_id, resource_type, resource):
+        return f'https://www.googleapis.com/compute/v1/projects/{project_id}/{resource_type}/{resource}'
+
+    @staticmethod
+    def _check_query(query):
         """
         Args:
             query (dict): example
@@ -199,28 +272,10 @@ class CollectorService(BaseService):
                 region_name.extend(value)
 
             else:
-                if isinstance(value, list) == False:
+                if not isinstance(value, list):
                     value = [value]
 
                 if len(value) > 0:
                     filters.append({'Name': key, 'Values': value})
 
-        return (filters, instance_ids, region_name)
-
-    def get_all_regions(self, secret_data, filter_region_name):
-        """ Find all region name
-        Args:
-            secret_data: secret data
-            region_name (list): list of region_name if wanted
-
-        Returns: list of region name
-        """
-
-        if 'region_name' in secret_data:
-            return [secret_data['region_name']]
-
-        if len(filter_region_name) > 0:
-            return filter_region_name
-
-        regions = self.collector_manager.list_regions(secret_data, DEFAULT_REGION)
-        return [region.get('RegionName') for region in regions if region.get('RegionName') is not None]
+        return filters, instance_ids, region_name

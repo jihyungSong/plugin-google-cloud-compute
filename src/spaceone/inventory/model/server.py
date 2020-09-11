@@ -1,60 +1,47 @@
 from schematics import Model
-from schematics.types import serializable, ModelType, ListType, StringType
-from spaceone.inventory.model import OS, AWS, Hardware, SecurityGroupRule, Compute, LoadBalancer, VPC, Subnet, \
-    AutoScalingGroup, NIC, Disk, ServerMetadata
+from schematics.types import ModelType, ListType, StringType
+from spaceone.inventory.model import OS, GoogleCloud, Hardware, SecurityGroup, Compute, LoadBalancer, VPC, Subnet, \
+    AutoScaler, NIC, Disk, ServerMetadata
 
 
 class ReferenceModel(Model):
     class Option:
         serialize_when_none = False
-
     resource_id = StringType(required=False, serialize_when_none=False)
     external_link = StringType(required=False, serialize_when_none=False)
 
 
 class ServerData(Model):
     os = ModelType(OS)
-    aws = ModelType(AWS)
+    google_cloud = ModelType(GoogleCloud)
     hardware = ModelType(Hardware)
-    security_group_rules = ListType(ModelType(SecurityGroupRule))
-    public_ip_address = StringType()
     compute = ModelType(Compute)
-    public_dns = StringType()
     load_balancers = ListType(ModelType(LoadBalancer))
+    security_group = ListType(ModelType(SecurityGroup))
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
-    auto_scaling_group = ModelType(AutoScalingGroup, serialize_when_none=False)
-
-    @serializable
-    def cloudwatch(self):
-        return {
-            "namespace": "AWS/EC2",
-            "dimensions": [
-                {
-                    "Name": "InstanceId",
-                    "Value": self.compute.instance_id
-                }
-            ],
-            "region_name": self.compute.region_name
-        }
+    auto_scaler = ModelType(AutoScaler, serialize_when_none=False)
 
 
 class Server(Model):
     name = StringType()
-    data = ModelType(ServerData)
-    nics = ListType(ModelType(NIC))
-    disks = ListType(ModelType(Disk))
-    ip_addresses = ListType(StringType())
     server_type = StringType(default='VM')
     os_type = StringType(choices=('LINUX', 'WINDOWS'))
-    provider = StringType(default='aws')
+    provider = StringType(default='google_cloud')
+    primary_ip_address = StringType()
+    ip_addresses = ListType(StringType())
+    region_code = StringType()
+    region_type = StringType(default='GOOGLE_CLOUD')
+    nics = ListType(ModelType(NIC))
+    disks = ListType(ModelType(Disk))
+    data = ModelType(ServerData)
     _metadata = ModelType(ServerMetadata, serialized_name='metadata')
-    # reference = ModelType(ReferenceModel)
+    reference = ModelType(ReferenceModel)
 
-    @serializable
-    def reference(self):
-        return {
-            "resource_id": f"arn:aws:ec2:{self.data.compute.region_name}:{self.data.compute.account_id}:instance/{self.data.compute.instance_id}",
-            "external_link": f"https://{self.data.compute.region_name}.console.aws.amazon.com/ec2/v2/home?region={self.data.compute.region_name}#Instances:instanceId={self.data.compute.instance_id}"
-        }
+    # @serializable
+    # def reference(self):
+    #     return {
+    #         "resource_id": ServerData.gcp.self_link,
+    #         "external_link": f"https://console.cloud.google.com/compute/instancesDetail/zones/{self.zone}instances/dk-instance01?project={self.data.compute.account}"
+    #     }
 

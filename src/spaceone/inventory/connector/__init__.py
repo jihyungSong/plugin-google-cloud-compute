@@ -1,1 +1,1 @@
-from spaceone.inventory.connector.ec2_connector import EC2Connector
+from spaceone.inventory.connector.google_cloud_compute_connector import GoogleCloudComputeConnector

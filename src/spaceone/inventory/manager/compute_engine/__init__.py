@@ -1,0 +1,9 @@
+from spaceone.inventory.manager.compute_engine.auto_scaler_manager import AutoScalerManager
+from spaceone.inventory.manager.compute_engine.load_balancer_manager import LoadBalancerManager
+from spaceone.inventory.manager.compute_engine.vpc_manager import VPCManager
+from spaceone.inventory.manager.compute_engine.vm_instance_manager import VMInstanceManager
+from spaceone.inventory.manager.compute_engine.nic_manager import NICManager
+from spaceone.inventory.manager.compute_engine.disk_manager import DiskManager
+from spaceone.inventory.manager.compute_engine.security_group_manager import SecurityGroupManager
+from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
+
