@@ -5,5 +5,6 @@ from spaceone.inventory.manager.compute_engine.vm_instance_manager import VMInst
 from spaceone.inventory.manager.compute_engine.nic_manager import NICManager
 from spaceone.inventory.manager.compute_engine.disk_manager import DiskManager
 from spaceone.inventory.manager.compute_engine.security_group_manager import SecurityGroupManager
+from spaceone.inventory.manager.compute_engine.stackdriver_manager import StackDriverManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
 

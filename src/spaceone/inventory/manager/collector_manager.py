@@ -5,11 +5,11 @@ import logging
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
-    DiskManager, NICManager, VPCManager, SecurityGroupManager
+    DiskManager, NICManager, VPCManager, SecurityGroupManager, StackDriverManager
 from spaceone.inventory.manager.metadata.metadata_manager import MetadataManager
 from spaceone.inventory.model.server import Server, ReferenceModel
 from spaceone.inventory.model.region import Region
-
+from pprint import pprint
 _LOGGER = logging.getLogger(__name__)
 NUMBER_OF_CONCURRENT = 20
 
@@ -96,6 +96,7 @@ class CollectorManager(BaseManager):
         nic_manager: NICManager = NICManager()
         vpc_manager: VPCManager = VPCManager()
         security_group_manager: SecurityGroupManager = SecurityGroupManager()
+        stackdriver_manager: StackDriverManager = StackDriverManager()
         meta_manager: MetadataManager = MetadataManager()
 
         server_data = vm_instance_manager.get_server_info(instance, instance_types, disks, zone_info, public_images)
@@ -119,7 +120,9 @@ class CollectorManager(BaseManager):
             'auto_scaler': auto_scaler_vo,
             'vpc': vpc_vo,
             'subnet': subnet_vo,
+            'stackdriver': stackdriver_manager.get_stackdriver_info(instance.get('name', ''))
         })
+
         server_data.update({
             '_metadata': meta_manager.get_metadata(),
             'reference': ReferenceModel({
