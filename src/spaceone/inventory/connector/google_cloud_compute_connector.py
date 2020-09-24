@@ -6,6 +6,7 @@ import google.oauth2.service_account
 import googleapiclient
 import googleapiclient.discovery
 from spaceone.core.connector import BaseConnector
+from pprint import pprint
 
 _LOGGER = logging.getLogger(__name__)
 INSTANCE_TYPE_FILE = '%s/conf/%s' % (os.path.dirname(os.path.abspath(__file__)), 'instances.json')
@@ -54,6 +55,7 @@ class GoogleCloudComputeConnector(BaseConnector):
             query.update({'filter': [status_filter]})
 
         query = self.generate_key_query('filter', self._get_filter_to_params(**query), '', is_default=True, **query)
+
         result = self.client.instances().list(**query).execute()
         compute_instances = result.get('items', [])
         return compute_instances

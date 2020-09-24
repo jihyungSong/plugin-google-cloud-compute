@@ -10,7 +10,7 @@ from spaceone.inventory.model.security_group import SecurityGroup
 from spaceone.inventory.model.subnet import Subnet
 from spaceone.inventory.model.vpc import VPC
 from spaceone.inventory.model.region import Region
-
+from spaceone.inventory.model.stackdriver import StackDriver
 # METADATA
 from spaceone.inventory.model.metadata.metadata import *
 from spaceone.inventory.model.metadata.metadata_dynamic_field import *

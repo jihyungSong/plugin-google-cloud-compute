@@ -1,7 +1,7 @@
 from schematics import Model
 from schematics.types import ModelType, ListType, StringType
 from spaceone.inventory.model import OS, GoogleCloud, Hardware, SecurityGroup, Compute, LoadBalancer, VPC, Subnet, \
-    AutoScaler, NIC, Disk, ServerMetadata
+    AutoScaler, NIC, Disk, ServerMetadata, StackDriver
 
 
 class ReferenceModel(Model):
@@ -21,6 +21,7 @@ class ServerData(Model):
     vpc = ModelType(VPC)
     subnet = ModelType(Subnet)
     auto_scaler = ModelType(AutoScaler, serialize_when_none=False)
+    stackdriver = ModelType(StackDriver)
 
 
 class Server(Model):
