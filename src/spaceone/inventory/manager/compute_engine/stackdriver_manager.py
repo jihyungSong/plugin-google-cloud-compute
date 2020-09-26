@@ -35,7 +35,6 @@ class StackDriverManager(BaseManager):
             }
         ]
         '''
-
         filter = {
             'key': 'resource.labels.instance_id',
             'value': instance_id
