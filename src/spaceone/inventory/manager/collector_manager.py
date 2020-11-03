@@ -127,7 +127,7 @@ class CollectorManager(BaseManager):
             '_metadata': meta_manager.get_metadata(),
             'reference': ReferenceModel({
                 'resource_id': server_data['data']['google_cloud']['self_link'],
-                'external_link': f"https://console.cloud.google.com/compute/instancesDetail/zones/{zone}instances/{server_data['name']}?project={server_data['data']['compute']['account']}"
+                'external_link': f"https://console.cloud.google.com/compute/instancesDetail/zones/{zone}/instances/{server_data['name']}?project={server_data['data']['compute']['account']}"
             })
         })
 
