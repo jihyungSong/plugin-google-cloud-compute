@@ -2,6 +2,8 @@ __all__ = ['CollectorManager']
 
 import time
 import logging
+import concurrent.futures
+
 from spaceone.core.manager import BaseManager
 from spaceone.inventory.connector import GoogleCloudComputeConnector
 from spaceone.inventory.manager.compute_engine import VMInstanceManager, AutoScalerManager, LoadBalancerManager, \
@@ -11,7 +13,7 @@ from spaceone.inventory.model.server import Server, ReferenceModel
 from spaceone.inventory.model.region import Region
 from pprint import pprint
 _LOGGER = logging.getLogger(__name__)
-NUMBER_OF_CONCURRENT = 20
+NUMBER_OF_CONCURRENT = 50
 
 
 class CollectorManager(BaseManager):
@@ -51,9 +53,17 @@ class CollectorManager(BaseManager):
         if len(params.get('instance_ids', [])) > 0:
             instance_filter.update({'filter': [{'key': 'id', 'values': params['instance_ids']}]})
 
-        return self.gcp_connector.list_instances(**instance_filter)
+        if 'connector' in params:
+            _conn = params['connector']
+            instances = _conn.list_instances(**instance_filter)
+        else:
+            instances = self.gcp_connector.list_instances(**instance_filter)
 
-    def get_instance(self, zone_info, instance, global_resources):
+        # print(f'{params["zone_info"]["zone"]} instances: {instances}')
+
+        return instances
+
+    def get_instance(self, conn, zone_info, instance, global_resources):
         zone = zone_info['zone']
 
         # VPC
@@ -74,17 +84,17 @@ class CollectorManager(BaseManager):
         firewalls = global_resources.get('fire_walls', [])
 
         # Get Instance Groups
-        instance_group = self.gcp_connector.list_instance_group_managers(zone=zone)
-        self.gcp_connector.set_instance_into_instance_group_managers(instance_group, zone=zone)
+        instance_group = conn.list_instance_group_managers(zone=zone)
+        conn.set_instance_into_instance_group_managers(instance_group, zone=zone)
 
         # Get Machine Types
-        instance_types = self.gcp_connector.list_machine_types(zone=zone)
+        instance_types = conn.list_machine_types(zone=zone)
 
         # Autoscaling group list
-        auto_scaler = self.gcp_connector.list_auto_scalers(zone=zone)
+        auto_scaler = conn.list_auto_scalers(zone=zone)
 
         # disks
-        disks = self.gcp_connector.list_disk(zone=zone)
+        disks = conn.list_disk(zone=zone)
         # TODO: if distro has additional requirement with os_distros for future
         # disk_types = self.gcp_connector.list_disk_types(zone=zone)
 
@@ -151,12 +161,21 @@ class CollectorManager(BaseManager):
                 'subnets': subnets,
                 'forwarding_rules': forwarding_rules,
             },
-            'instances': [...]
+            'instances': [...],
+            'connector': google cloud connector instance
         }
         '''
 
         print(f"START LIST Resources {params['zone_info']['zone']}")
         start_time = time.time()
+
+        # if self.gcp_connector is None:
+        #     self.gcp_connector = params['connector']
+
+        if 'connector' in params:
+            _conn = params['connector']
+        else:
+            _conn = self.gcp_connector
 
         # try:
         secret_data = params.get('secret_data', {})
@@ -167,7 +186,7 @@ class CollectorManager(BaseManager):
         instances = params.get('instances', [])
         global_resources = params['resources']
 
-        resources = [self.get_instance(zone_info, instance, global_resources) for instance in instances]
+        resources = [self.get_instance(_conn, zone_info, instance, global_resources) for instance in instances]
         print(f'   [{params["zone_info"]["zone"]}] Finished {time.time() - start_time} Seconds')
         return resources
 
@@ -177,20 +196,34 @@ class CollectorManager(BaseManager):
 
     def list_subnets(self, params):
         # print(f"[START] LIST Subnet {params['region']}")
-        return self.gcp_connector.list_subnets(region=params['region'])
+        if 'connector' in params:
+            return params['connector'].list_subnets(region=params['region'])
+        else:
+            return self.gcp_connector.list_subnets(region=params['region'])
 
     def list_forwarding_rules(self, params):
-        # print(f"LIST Forwarding Rules START.. {params['region']}")
-        return self.gcp_connector.list_forwarding_rules(region=params['region'])
+        if 'connector' in params:
+            return params['connector'].list_forwarding_rules(region=params['region'])
+        else:
+            return self.gcp_connector.list_forwarding_rules(region=params['region'])
 
     def list_target_pools(self, params):
-        return self.gcp_connector.list_target_pools(region=params['region'])
+        if 'connector' in params:
+            return self.gcp_connector.list_target_pools(region=params['region'])
+        else:
+            return self.gcp_connector.list_target_pools(region=params['region'])
 
     def list_region_url_maps(self, params):
-        return self.gcp_connector.list_region_url_maps(region=params['region'])
+        if 'connector' in params:
+            return self.gcp_connector.list_region_url_maps(region=params['region'])
+        else:
+            return self.gcp_connector.list_region_url_maps(region=params['region'])
 
     def list_region_backend_svcs(self, params):
-        return self.gcp_connector.list_region_backend_svcs(region=params['region'])
+        if 'connector' in params:
+            return self.gcp_connector.list_region_backend_svcs(region=params['region'])
+        else:
+            return self.gcp_connector.list_region_backend_svcs(region=params['region'])
 
     def list_public_images(self):
 
@@ -212,7 +245,7 @@ class CollectorManager(BaseManager):
             public_images[public_image.get('key')] = image_list
         return public_images
 
-    def get_global_resources(self, secret_data, regions):
+    def get_global_resources(self, secret_data, regions, connectors):
         # print("[ GET zone independent resources ]")
         if self.gcp_connector is None:
             self.set_connector(secret_data)
@@ -231,36 +264,94 @@ class CollectorManager(BaseManager):
         forwarding_rules = []
         target_pools = []
 
-        for region_param in self.generate_region_params(regions):
-            subnets.extend(self.list_subnets(region_param))
-            forwarding_rules.extend(self.list_forwarding_rules(region_param))
-            target_pools.extend(self.list_target_pools(region_param))
-            url_maps.extend(self.list_region_url_maps(region_param))
-            backend_svcs.extend(self.list_region_backend_svcs(region_param))
+        region_params = self.generate_region_params_with_connector(regions, connectors)
+
+        # for region_param in self.generate_region_params(regions):
+        #     subnets.extend(self.list_subnets(region_param))
+        #     forwarding_rules.extend(self.list_forwarding_rules(region_param))
+        #     target_pools.extend(self.list_target_pools(region_param))
+        #     url_maps.extend(self.list_region_url_maps(region_param))
+        #     backend_svcs.extend(self.list_region_backend_svcs(region_param))
 
         # Generate Thread Pool for collecting Subnets
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
-        #     future_executors = []
-        #     for mt_param in mt_params:
-        #         future_executors.append(executor.submit(self.list_subnets, mt_param))
-        #
-        #     for future in concurrent.futures.as_completed(future_executors):
-        #         for result in future.result():
-        #             subnets.append(result)
+        print("==> Start Thread for List Subnets")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as subnet_executor:
+            subnet_future_executors = []
+            for _params in region_params:
+                subnet_future_executors.append(subnet_executor.submit(self.list_subnets, _params))
 
+            print(subnet_future_executors)
+
+            for subnet_future in concurrent.futures.as_completed(subnet_future_executors):
+                result = subnet_future.result()
+                subnets.extend(result)
+
+        print("==> Start Thread for List Forwarding Rules")
         # Generate Thread Pool for collecting Forwarding Rules
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
-        #     future_executors = []
-        #     for mt_param in mt_params:
-        #         future_executors.append(executor.submit(self.list_forwarding_rules, mt_param))
-        #
-        #     for future in concurrent.futures.as_completed(future_executors):
-        #         for result in future.result():
-        #             forwarding_rules.append(result)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as forwarding_rule_executor:
+            forwarding_rules_future_executors = []
+            for _params in region_params:
+                forwarding_rules_future_executors.append(forwarding_rule_executor.submit(self.list_forwarding_rules, _params))
 
-        # print("====== END of zone independent resources")
+            print(forwarding_rules_future_executors)
 
-        return {
+            for forwarding_rule_future in concurrent.futures.as_completed(forwarding_rules_future_executors):
+                result = forwarding_rule_future.result()
+                forwarding_rules.extend(result)
+
+        time.sleep(5)
+
+        print("==> Start Thread for List Target Pools")
+        # Generate Thread Pool for collecting Target Pools
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as target_pool_executor:
+            target_pools_future_executors = []
+            for _params in region_params:
+                target_pools_future_executors.append(target_pool_executor.submit(self.list_target_pools, _params))
+
+            print(target_pools_future_executors)
+
+            for target_pool_future in concurrent.futures.as_completed(target_pools_future_executors):
+                result = target_pool_future.result()
+                target_pools.extend(result)
+
+        print("=== Target Pool Results")
+        print(target_pools)
+
+        print("==> Start Thread for List Region URL Maps")
+        # Generate Thread Pool for collecting URL Maps
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as url_map_executor:
+            url_maps_future_executors = []
+            for _params in region_params:
+                url_maps_future_executors.append(url_map_executor.submit(self.list_region_url_maps, _params))
+
+            print(url_maps_future_executors)
+
+            for url_map_future in concurrent.futures.as_completed(url_maps_future_executors):
+                result = url_map_future.result()
+                url_maps.extend(result)
+
+        print("=== URL Maps Results")
+        print(url_maps)
+
+        print("==> Start Thread for List Region Backend Services")
+        # Generate Thread Pool for collecting Region Backend Services
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as backend_svc_executor:
+            backend_svc_future_executors = []
+            for _params in region_params:
+                backend_svc_future_executors.append(backend_svc_executor.submit(self.list_region_backend_svcs, _params))
+
+            print(backend_svc_future_executors)
+
+            for backend_svc_future in concurrent.futures.as_completed(backend_svc_future_executors):
+                result = backend_svc_future.result()
+                backend_svcs.extend(result)
+
+        print("=== Backend SVC Results")
+        print(backend_svcs)
+
+        print("====== END of zone independent resources")
+
+        global_resources = {
             'public_images': public_images,
             'images': images,
             'vpcs': vpcs,
@@ -272,9 +363,22 @@ class CollectorManager(BaseManager):
             'backend_svcs': backend_svcs
         }
 
+        # print("!!!!!")
+        # print(global_resources)
 
-    def generate_region_params(self, regions):
-        return list(map(lambda region: {'region': region['name']}, regions))
+        return global_resources
+
+    @staticmethod
+    def generate_region_params_with_connector(regions, connectors):
+        params = []
+
+        for index, region in enumerate(regions):
+            params.append({
+                'region': region['name'],
+                'connector': connectors[index]
+            })
+
+        return params
 
     @staticmethod
     def _set_project_id_to_zone_info(zone_info, project_id):
@@ -284,9 +388,9 @@ class CollectorManager(BaseManager):
     @staticmethod
     def get_region_from_result(result):
         REGION_INFO = {
-            'asia-east1': {'name': 'Changhua County, Taiwan'},
+            'asia-east1': {'name': 'Changhua County, Taiwan',},
             'asia-east2': {'name': 'Hong Kong'},
-            'asia-northeast1': {'name': 'Tokyo, Japan'},
+            'asia-northeast1': {'name': 'Japan (Tokyo)', },
             'asia-northeast2': {'name': 'Osaka, Japan'},
             'asia-northeast3': {'name': 'Seoul, South Korea'},
             'asia-south1': {'name': 'Mumbai, India'},

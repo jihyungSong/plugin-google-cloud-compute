@@ -1,5 +1,7 @@
 import time
 import logging
+import concurrent.futures
+
 from spaceone.core.service import *
 from spaceone.inventory.manager.collector_manager import CollectorManager
 
@@ -60,7 +62,7 @@ FILTER_FORMAT = [
 ]
 
 SUPPORTED_RESOURCE_TYPE = ['inventory.Server', 'inventory.Region']
-NUMBER_OF_CONCURRENT = 20
+NUMBER_OF_CONCURRENT = 50
 
 
 @authentication_handler
@@ -114,6 +116,10 @@ class CollectorService(BaseService):
         """
 
         start_time = time.time()
+
+        self.collector_manager.set_connector(params['secret_data'])
+
+        print("---> List Regions Call")
         all_regions = self.collector_manager.list_regions(params['secret_data'])
 
         resource_regions = []
@@ -125,33 +131,76 @@ class CollectorService(BaseService):
         region_resource_format = {'resource_type': 'inventory.Region',
                                   'match_rules': {'1': ['region_code', 'region_type']}}
 
-        # parameter setting for multi threading
-        mt_params = self.set_params_for_zones(params, all_regions)
+        print("---> AZ")
+        target_zones = self.get_target_zones(params, all_regions)
+        print("---> Connector")
+        gcp_connectors = self.set_connectors(params, target_zones)
+        params_with_zones = self.set_params_for_zones(params, target_zones, gcp_connectors)
 
         # TODO: parallel collecting instances through multi threading
         target_params = []
         is_instance = False
-        for params in mt_params:
-            _instances = self.collector_manager.list_instances_only(params)
 
-            if _instances:
-                params.update({
-                    'instances':  _instances
-                })
+        instance_start_time = time.time()
 
-                target_params.append(params)
-                is_instance = True
+        multi_params = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+            future_executors = []
+            for params_with_zone in params_with_zones:
+                # future_executors.append(executor.submit(self.collector_manager.list_instances_only, mt_param))
+                future_executors.append(executor.submit(self.set_params_for_instances, params_with_zone))
+
+            for future in concurrent.futures.as_completed(future_executors):
+                _params_with_instances = future.result()
+
+                if _params_with_instances:
+                    multi_params.append(_params_with_instances)
+                    is_instance = True
+
+        # for params in mt_params:
+        #     print(f"---> List Instance Only Call: {params['zone_info']['zone']}")
+        #     _instances = self.collector_manager.list_instances_only(params)
+        #
+        #     if _instances:
+        #         params.update({
+        #             'instances':  _instances
+        #         })
+        #
+        #         target_params.append(params)
+        #         is_instance = True
+
+        print(f'instance FINISHED {time.time() - instance_start_time} Sec ##################')
 
         if is_instance:
-            global_resources = self.collector_manager.get_global_resources(params['secret_data'], all_regions)
+            print('---> List Global Resources Call')
+            global_resources = self.collector_manager.get_global_resources(params['secret_data'], all_regions,
+                                                                           gcp_connectors)
 
             resources = []
-            for params in target_params:
+            for params in multi_params:
                 params.update({
                     'resources': global_resources
                 })
 
-                resources.extend(self.collector_manager.list_resources(params))
+                # resources.extend(self.collector_manager.list_resources(params))
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+                future_executors = []
+                for _params in multi_params:
+                    future_executors.append(executor.submit(self.collector_manager.list_resources, _params))
+
+                for future in concurrent.futures.as_completed(future_executors):
+                    for result in future.result():
+                        collected_region = self.collector_manager.get_region_from_result(result)
+
+                        if collected_region is not None and collected_region.region_code not in collected_region_code:
+                            resource_regions.append(collected_region)
+                            collected_region_code.append(collected_region.region_code)
+
+                        yield result, server_resource_format
+
+            for resource_region in resource_regions:
+                yield resource_region, region_resource_format
 
             for resource in resources:
                 collected_region = self.collector_manager.get_region_from_result(resource)
@@ -186,27 +235,56 @@ class CollectorService(BaseService):
 
         print(f'############## TOTAL FINISHED {time.time() - start_time} Sec ##################')
 
-    def set_params_for_zones(self, params, all_regions):
+    def get_target_zones(self, params, all_regions):
+        query, instance_ids, filter_region_name = self._check_query(params['filter'])
+        return self.get_all_zones(params.get('secret_data', ''), filter_region_name, all_regions)
+
+    def set_connectors(self, params, zones):
+        connectors = []
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUMBER_OF_CONCURRENT) as executor:
+            future_executors = []
+            for zone in zones:
+                future_executors.append(executor.submit(self.set_connector, params))
+
+            for future in concurrent.futures.as_completed(future_executors):
+                connectors.append(future.result())
+
+        return connectors
+
+    def set_connector(self, params):
+        _conn = self.locator.get_connector('GoogleCloudComputeConnector')
+        _conn.get_connect(params['secret_data'])
+        return _conn
+
+    def set_params_for_zones(self, params, target_zones, connectors):
         # print("[ SET Params for ZONES ]")
         params_for_zones = []
 
-        (query, instance_ids, filter_region_name) = self._check_query(params['filter'])
-        target_zones = self.get_all_zones(params.get('secret_data', ''), filter_region_name, all_regions)
+        query, instance_ids, filter_region_name = self._check_query(params['filter'])
 
-        for target_zone in target_zones:
-            # _conn = self.locator.get_connector('GoogleCloudComputeConnector')
-            # _conn.get_connect(params['secret_data'])
-
+        for i, target_zone in enumerate(target_zones):
             params_for_zones.append({
-                # 'connector': _conn,
                 'zone_info': target_zone,
                 'query': query,
                 'secret_data': params['secret_data'],
                 'instance_ids': instance_ids,
-                # 'resources': resources
+                'connector': connectors[i]
             })
 
         return params_for_zones
+
+    def set_params_for_instances(self, params):
+        instances = self.collector_manager.list_instances_only(params)
+
+        if instances:
+            params.update({
+                'instances': instances
+            })
+
+            return params
+
+        return None
 
     def get_all_zones(self, secret_data, filter_region_name, all_regions):
         """ Find all zone name
@@ -229,7 +307,7 @@ class CollectorService(BaseService):
             # print(f'region count = {len(all_regions)}')
             for region in all_regions:
                 for zone in region.get('zones', []):
-                    match_zones.append({'zone': zone.split('/')[-1], 'region': region['name']})
+                    match_zones.append({'zone': self._get_zone_name_from_zone_uri(zone), 'region': region['name']})
 
         return match_zones
 
@@ -279,3 +357,7 @@ class CollectorService(BaseService):
                     filters.append({'Name': key, 'Values': value})
 
         return filters, instance_ids, region_name
+
+    @staticmethod
+    def _get_zone_name_from_zone_uri(zone):
+        return zone.split('/')[-1]

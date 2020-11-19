@@ -16,6 +16,7 @@ class GoogleCloudComputeConnector(BaseConnector):
 
     def __init__(self, transaction=None, config=None):
         self.client = None
+        self.credentials = None
         self.project_id = None
 
     def verify(self, options, secret_data):
@@ -32,8 +33,13 @@ class GoogleCloudComputeConnector(BaseConnector):
         """
         try:
             self.project_id = secret_data.get('project_id')
-            credentials = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
-            self.client = googleapiclient.discovery.build('compute', 'v1', credentials=credentials)
+
+            if self.credentials is None:
+                self.credentials = google.oauth2.service_account.Credentials.from_service_account_info(secret_data)
+
+            if self.client is None:
+                self.client = googleapiclient.discovery.build('compute', 'v1', credentials=self.credentials)
+
         except Exception as e:
             print(e)
             raise self.client(message='connection failed. Please check your authentication information.')
@@ -77,7 +83,6 @@ class GoogleCloudComputeConnector(BaseConnector):
         response = self.client.backendServices().list(**query).execute()
         url_map = response.get('items', [])
         return url_map
-
 
     def list_disk(self, **query):
         query = self.generate_query(**query)
