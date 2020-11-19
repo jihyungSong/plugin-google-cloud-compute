@@ -20,7 +20,6 @@ class VMInstanceManager(BaseManager):
             "primary_ip_address": '',
             "ip_addresses": '',
             "region_code": '',
-            "region_type": ''
             "data":  {
                 "os": {
                     "os_arch": "",
@@ -89,8 +88,7 @@ class VMInstanceManager(BaseManager):
             'provider': 'google_cloud',
             'primary_ip_address': self._get_primary_ip_address(instance),
             'ip_addresses': self._get_ip_addresses(instance),
-            'region_code': zone_info.get('region', ''),
-            'region_type': 'GOOGLE_CLOUD'
+            'region_code': zone_info.get('region', '')
         }
 
         return server_data
